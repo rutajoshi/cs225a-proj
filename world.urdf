@@ -1,0 +1,88 @@
+<?xml version="1.0" ?>
+
+<world name="demo_world" gravity="0.0 0.0 -9.81">
+
+	<robot name="panda_arm">
+		<origin xyz="0.5 -0.4 0.05" rpy="0 0 1.57" />
+		<model dir="./resources" path="panda_arm.urdf" name="panda_arm" />
+	</robot>
+
+	<robot name="human_leg">
+		<origin xyz="1.25 -0.2 0.15" rpy="-1.57079632679 3.14159265359 0" />
+		<model dir="./resources" path="human_leg.urdf" name="human_leg" />
+	</robot>
+
+	<static_object name="Table">
+	  <origin xyz="1.0 0.0 -0.25" rpy="0 0 0" />
+	  <collision>
+	    <origin xyz="0.0 0.0 0.05" rpy="0 0 0" />
+	    <geometry>
+	      <box size="3.0 1.5 0.5" />
+	    </geometry>
+	  </collision>
+	  <visual>
+	    <origin xyz="0.0 0.0 0.05" rpy="0 0 0" />
+	    <geometry>
+	      <box size="3.0 1.5 0.5" />
+	    </geometry>
+	    <material name="material_grey">
+	      <color rgba="0.1 0.1 0.1 1.0" />
+	    </material>
+	  </visual>
+	</static_object>
+
+	<static_object name="Pillow">
+		<origin xyz="0.25 0 0" rpy="0 0 0" />
+		<collision>
+			<origin xyz="0.0 0.0 0.05" rpy="0 0 0" />
+			<geometry>
+				<box size="0.15 0.25 0.1" />
+			</geometry>
+		</collision>
+		<visual>
+			<origin xyz="0.0 0.0 0.05" rpy="0 0 0" />
+			<geometry>
+				<box size="0.15 0.25 0.1" />
+			</geometry>
+			<material name="material_grey">
+				<color rgba="0.6 0.6 0.6 1.0" />
+			</material>
+		</visual>
+	</static_object>
+
+	<static_object name="Ground_With_Texture">
+		<origin xyz="0.0 0.0 -0.5" rpy="0 0 0" />
+		<collision>
+			<origin xyz="0.0 0.0 -0.0001" rpy="0 0 0" />
+			<geometry>
+				<box size="100 100 0.0002" />
+			</geometry>
+		</collision>
+		<visual>
+			<origin xyz="0.0 0.0 -0.0001" rpy="0 0 0" />
+			<geometry>
+				<box size="100 100 0.0002" />
+			</geometry>
+			<material name="material">
+				<color rgba="0.2 0.2 0.2 1.0" />
+			</material>
+		</visual>
+	</static_object>
+
+	<light name="light1" type="directional">
+		<position xyz="2.0 -2.0 2.0" />
+		<lookat xyz="0.0 0.0 0.0" />
+	</light>
+
+	<light name="light2" type="directional">
+		<position xyz="2.0 2.0 2.0" />
+		<lookat xyz="0.0 0.0 0.0" />
+	</light>
+
+	<camera name="camera_fixed">
+		<position xyz="1.0 2.5 2.0" />
+		<vertical xyz="0.0 0.0 1.0" />
+		<lookat xyz="1.0 0.0 0.25" />
+	</camera>
+
+</world>
