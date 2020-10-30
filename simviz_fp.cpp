@@ -29,14 +29,16 @@ const string camera_name = "camera_fixed";
 // - write:
 const std::string JOINT_ANGLES_KEY = "sai2::cs225a::panda_robot::sensors::q";
 const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::panda_robot::sensors::dq";
+const std::string LEG_JOINT_ANGLES_KEY = "sai2::cs225a::leg_robot::sensors::q";
+const std::string LEG_JOINT_VELOCITIES_KEY = "sai2::cs225a::leg_robot::sensors::dq";
 // - read
 const std::string TORQUES_COMMANDED_KEY = "sai2::cs225a::panda_robot::actuators::fgc";
-const string CONTROLLER_RUNING_KEY = "sai2::cs225a::controller_running";
+const string CONTROLLER_RUNNING_KEY = "sai2::cs225a::controller_running";
 
 RedisClient redis_client;
 
 // simulation function prototype
-void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim);
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim);
 
 // callback to print glfw errors
 void glfwError(int error, const char* description);
@@ -73,20 +75,31 @@ int main() {
 	Eigen::Vector3d camera_pos, camera_lookat, camera_vertical;
 	graphics->getCameraPose(camera_name, camera_pos, camera_vertical, camera_lookat);
 	graphics->showLinkFrame(true, leg_name, leg_link_name, 0.15);
+	// graphics->showLinkFrame(true, leg_name, "link0", 0.15);
+	graphics->_world->m_backgroundColor.setWhite();
 
 	// load robots
 	auto robot = new Sai2Model::Sai2Model(robot_file, false);
 	robot->updateKinematics();
 
+	// load leg robot
+	auto leg = new Sai2Model::Sai2Model(leg_file, false);
+	leg->_q << 45*M_PI/180, 45*M_PI/180;  // fall
+	// leg->_q << -90*M_PI/180, 0*M_PI/180;
+	leg->updateKinematics();
+
 	// load simulation world
 	auto sim = new Simulation::Sai2Simulation(world_file, false);
 	sim->setCollisionRestitution(0);
-	sim->setCoeffFrictionStatic(0.6);
+	sim->setCoeffFrictionStatic(0.8);
 
 	// read joint positions, velocities, update model
 	sim->getJointPositions(robot_name, robot->_q);
 	sim->getJointVelocities(robot_name, robot->_dq);
 	robot->updateKinematics();
+
+	sim->setJointPositions(leg_name, leg->_q);
+	sim->setJointVelocities(leg_name, leg->_dq);
 
 	/*------- Set up visualization -------*/
 	// set up error callback
@@ -122,9 +135,9 @@ int main() {
 	// cache variables
 	double last_cursorx, last_cursory;
 
-	redis_client.set(CONTROLLER_RUNING_KEY, "0");
+	redis_client.set(CONTROLLER_RUNNING_KEY, "0");
 	fSimulationRunning = true;
-	thread sim_thread(simulation, robot, sim);
+	thread sim_thread(simulation, robot, leg, sim);
 
 	// while window is open:
 	while (fSimulationRunning)
@@ -134,6 +147,7 @@ int main() {
 		int width, height;
 		glfwGetFramebufferSize(window, &width, &height);
 		graphics->updateGraphics(robot_name, robot);
+		graphics->updateGraphics(leg_name, leg);
 		graphics->render(camera_name, width, height);
 
 		// swap buffers
@@ -221,12 +235,14 @@ int main() {
 }
 
 //------------------------------------------------------------------------------
-void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim) {
-
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim)
+{
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
 	VectorXd gravity = VectorXd::Zero(dof);
 	redis_client.setEigenMatrixJSON(TORQUES_COMMANDED_KEY, command_torques);
+
+	int leg_dof = leg->dof();
 
 	// create a timer
 	LoopTimer timer;
@@ -240,12 +256,10 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim) {
 	while (fSimulationRunning) {
 		fTimerDidSleep = timer.waitForNextLoop();
 
-		if(redis_client.get(CONTROLLER_RUNING_KEY) == "1")
-		{
+		if(redis_client.get(CONTROLLER_RUNNING_KEY) == "1") {
 			gravity.setZero();
 		}
-		else
-		{
+		else {
 			robot->gravityVector(gravity);
 		}
 
@@ -258,6 +272,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim) {
 		// integrate forward
 		// double curr_time = timer.elapsedTime();
 		// double loop_dt = curr_time - last_time;
+		// sim->integrate(loop_dt);
 		sim->integrate(0.001);
 
 		// read joint positions, velocities, update model
@@ -265,11 +280,17 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim) {
 		sim->getJointVelocities(robot_name, robot->_dq);
 		robot->updateKinematics();
 
+		sim->getJointPositions(leg_name, leg->_q);
+		sim->getJointVelocities(leg_name, leg->_dq);
+		leg->updateKinematics();
+
 		// write new robot state to redis
 		redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q);
 		redis_client.setEigenMatrixJSON(JOINT_VELOCITIES_KEY, robot->_dq);
+		redis_client.setEigenMatrixJSON(LEG_JOINT_ANGLES_KEY, leg->_q);
+		redis_client.setEigenMatrixJSON(LEG_JOINT_VELOCITIES_KEY, leg->_dq);
 
-		//update last time
+		// update last time
 		// last_time = curr_time;
 
 		simulation_counter++;
