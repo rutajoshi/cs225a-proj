@@ -75,6 +75,8 @@ int main() {
 	leg->_q = redis_client.getEigenMatrixJSON(LEG_JOINT_ANGLES_KEY);
 	VectorXd initial_leg_q = leg->_q;
 
+	cout << "leg->_q = " << leg->_q << "\n";
+
 	// prepare controller
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
@@ -91,21 +93,16 @@ int main() {
 
 	// task position
 	Vector3d X;
-	// X << 0.3, 0.3, 0.3;
 	robot->position(X, control_link, control_point);
-	// X(0) = l1 * cos(M_PI*q1/180) + l2 * cos(M_PI*(q1 + q2)/180);
-	// X(1) = l1 * sin(M_PI*q1/180) + l2 * sin(M_PI*(q1 + q2)/180);
-	// X(2) = 0.0;
 
 	// Frame transformation from the leg to the world frame
-	// Vector3d T_world_leg;
-	// T_world_leg << 1.25, -0.2, 0.15; // addition
-	// X = X + T_world_leg;
-	//
+	Vector3d T_world_leg;
+	T_world_leg << 1.25, 0.0, 0.15;
+
 	// // Frame transformation from the world to the robot frame
-	// Vector3d T_world_robot;
-	// T_world_robot << 0.5, -0.4, 0.05; // addition
-	// X = X + T_world_robot;
+	Vector3d T_world_robot;
+	T_world_robot << 0.5, -0.4, 0.05;
+
 
 #ifdef USING_OTG
 	posori_task->_use_interpolation_flag = true;
@@ -144,6 +141,8 @@ int main() {
 	double start_time = timer.elapsedTime(); //secs
 	bool fTimerDidSleep = true;
 	int state = POSORI_CONTROLLER;
+
+	int count = 0;
 
 	while (runloop) {
 		// wait for next scheduled loop
@@ -192,21 +191,36 @@ int main() {
 			Vector3d pos;
 			robot->position(pos, control_link, control_point);
 
+			// cout << "X = " << X << "\n";
 			// cout << "pos = " << pos << "\n";
 
 			if( (pos - X).norm() < 0.15 )
 			{
-				cout << "Activating controller. Made it to 0.3s\n";
-				X << 0.3, 0.3, 0.3;
-				// double q1 = 45.0*sin(6*M_PI*time/100 - M_PI/2.0) + 75.0;
-				// double q2 = -30.0*sin(6*M_PI*time/100 - M_PI/2) - 90.0;
-				//
-				// X(0) = l1 * cos(M_PI*q1/180) + l2 * cos(M_PI*(q1 + q2)/180);
-				// X(1) = l1 * sin(M_PI*q1/180) + l2 * sin(M_PI*(q1 + q2)/180);
+				cout << "Made it to position X. Updating X";
+				// X << 0.3, 0.3, 0.3;
+				count += 1;
+				// double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) + (75.0*M_PI/180);
+				// double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
+				// double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (15.0*M_PI/180);
+				// double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
+
+				double q1 = (30.0/180)*M_PI; // -60, -30, 0, 30;
+				double q2 = (-120.0/180)*M_PI; // -60, -80, -100, -120
+
+				// X(0) = l1 * cos(q1) + l2 * cos(q1 + q2);
+				// X(1) = l1 * sin(q1) + l2 * sin(q1 + q2);
 				// X(2) = 0.0;
 
-				// X = X + T_world_leg;
-				// X = X + T_world_robot;
+				X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
+				X(1) = 0.0;
+				X(2) = l1 * cos(q1) + l2 * cos(q1 + q2);
+
+				// original qs are in base-of-leg frame
+				// 1. transform from leg to world frame (subtract world->leg)
+				// 2. transform from world to robot frame (add world->robot)
+
+				X = X - T_world_leg;
+				X = X + T_world_robot;
 
 				posori_task->reInitializeTask();
 				posori_task->_desired_position = X;
