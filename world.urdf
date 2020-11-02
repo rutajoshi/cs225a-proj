@@ -8,7 +8,7 @@
 	</robot>
 
 	<robot name="human_leg">
-		<origin xyz="1.25 -0.2 0.15" rpy="0 0 0" />
+		<origin xyz="1.25 0 0.15" rpy="0 0 0" />
 		<model dir="./resources" path="human_leg.urdf" name="human_leg" />
 	</robot>
 

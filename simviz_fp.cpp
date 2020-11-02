@@ -84,7 +84,7 @@ int main() {
 
 	// load leg robot
 	auto leg = new Sai2Model::Sai2Model(leg_file, false);
-	leg->_q << 45*M_PI/180, 45*M_PI/180;  // fall
+	leg->_q << -45*M_PI/180, 0*M_PI/180;  // fall
 	// leg->_q << -90*M_PI/180, 0*M_PI/180;
 	leg->updateKinematics();
 
