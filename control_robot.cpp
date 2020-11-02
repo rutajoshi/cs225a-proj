@@ -74,6 +74,7 @@ int main() {
 	auto leg = new Sai2Model::Sai2Model(leg_file, false);
 	leg->_q = redis_client.getEigenMatrixJSON(LEG_JOINT_ANGLES_KEY);
 	VectorXd initial_leg_q = leg->_q;
+	leg->updateModel();
 
 	cout << "leg->_q = " << leg->_q << "\n";
 
@@ -83,7 +84,7 @@ int main() {
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
 
 	// pose task
-	const string control_link = "link7";
+	const string control_link = "leftfinger";
 	const Vector3d control_point = Vector3d(0,0,0.07);
 	auto posori_task = new Sai2Primitives::PosOriTask(robot, control_link, control_point);
 
@@ -130,9 +131,13 @@ int main() {
 	joint_task->_kv = 15.0;
 
 	VectorXd q_init_desired = initial_q;
-	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
+	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0, 0.0, 0.0;
+	//q_init_desired << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 	q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
+
+	// posori task
+	posori_task->_desired_position = Vector3d(0,0,0);
 
 	// create a timer
 	LoopTimer timer;
@@ -170,7 +175,7 @@ int main() {
 			if( (robot->_q - q_init_desired).norm() < 0.15 )
 			{
 				posori_task->reInitializeTask();
-				posori_task->_desired_position += Vector3d(-0.1,0.1,0.1);
+				posori_task->_desired_position += Vector3d(-0.0,0.0,0.0);
 				posori_task->_desired_orientation = AngleAxisd(M_PI/6, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
 
 				joint_task->reInitializeTask();
@@ -190,6 +195,8 @@ int main() {
 
 			Vector3d pos;
 			robot->position(pos, control_link, control_point);
+
+			posori_task->_desired_position = Vector3d(0.2, 0.2, 0.2);
 
 			// cout << "X = " << X << "\n";
 			// cout << "pos = " << pos << "\n";
@@ -211,16 +218,16 @@ int main() {
 				// X(1) = l1 * sin(q1) + l2 * sin(q1 + q2);
 				// X(2) = 0.0;
 
-				X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
-				X(1) = 0.0;
-				X(2) = l1 * cos(q1) + l2 * cos(q1 + q2);
+				// X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
+				// X(1) = 0.0;
+				// X(2) = l1 * cos(q1) + l2 * cos(q1 + q2);
 
 				// original qs are in base-of-leg frame
 				// 1. transform from leg to world frame (subtract world->leg)
 				// 2. transform from world to robot frame (add world->robot)
 
-				X = X - T_world_leg;
-				X = X + T_world_robot;
+				// X = X - T_world_leg;
+				// X = X + T_world_robot;
 
 				posori_task->reInitializeTask();
 				posori_task->_desired_position = X;
@@ -231,6 +238,11 @@ int main() {
 			joint_task->computeTorques(joint_task_torques);
 
 			command_torques = posori_task_torques + joint_task_torques;
+			// command_torques(7) = 0.0;
+			// command_torques(8) = 0.0;
+
+
+
 		}
 
 		// send to redis
