@@ -18,8 +18,8 @@ using namespace std;
 using namespace Eigen;
 
 const string world_file = "./resources/world.urdf";
-const string robot_file = "./resources/panda_arm.urdf";
-const string robot_name = "panda_arm";
+const string robot_file = "./resources/panda_arm_hand.urdf";
+const string robot_name = "panda_arm_hand";
 const string leg_file = "./resources/human_leg.urdf"; // Added
 const string leg_name = "human_leg"; // Added
 const string leg_link_name = "link2";

@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<robot name="panda_arm">
+<robot name="panda_arm_hand">
 
     <link name="link0">
       <inertial>
@@ -149,7 +149,42 @@
         </geometry>
       </collision> -->
     </link>
-
+    <link name="leftfinger">
+      <inertial>
+        <origin xyz="0 0 0.05" rpy="0 -0 0" />
+        <mass value="0.1" />
+        <inertia ixx="0.01" iyy="0.01" izz="0.005" ixy="0" ixz="0" iyz="0" />
+      </inertial>
+      <visual>
+        <geometry>
+          <mesh filename="../../../model/panda/meshes/visual/finger.obj"/>
+        </geometry>
+      </visual>
+<!--       <collision>
+        <geometry>
+          <mesh filename="../../../model/panda/meshes/collision/finger.obj"/>
+        </geometry>
+      </collision> -->
+    </link>
+    <link name="rightfinger">
+      <inertial>
+        <origin xyz="0 0 0.05" rpy="0 -0 0" />
+        <mass value="0.1" />
+        <inertia ixx="0.01" iyy="0.01" izz="0.005" ixy="0" ixz="0" iyz="0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 3.14159265359" />
+        <geometry>
+          <mesh filename="../../../model/panda/meshes/visual/finger.obj"/>
+        </geometry>
+      </visual>
+<!--       <collision>
+        <origin xyz="0 0 0" rpy="0 0 3.14159265359" />
+        <geometry>
+          <mesh filename="../../../model/panda/meshes/collision/finger.obj"/>
+        </geometry>
+      </collision> -->
+    </link>
     <joint name="joint1" type="revolute">
       <safety_controller k_position="100.0" k_velocity="40.0" soft_lower_limit="-2.8973" soft_upper_limit="2.8973"/>
       <origin rpy="0 0 0" xyz="0 0 0.333"/>
@@ -209,5 +244,23 @@
       <axis xyz="0 0 1"/>
       <limit effort="12" lower="-2.8973" upper="2.8973" velocity="2.6100"/>
     </joint>
-
+    <joint name="finger_joint1" type="prismatic">
+      <!-- <safety_controller k_position="100.0" k_velocity="40.0" soft_lower_limit="0" soft_upper_limit="0.3"/> -->
+      <parent link="link7"/>
+      <child link="leftfinger"/>
+      <origin xyz="0 0 0.1654" rpy="0 0 -0.78539816339"/>
+      <axis xyz="0 1 0"/>
+      <calibration rising="0.02" />
+      <limit effort="20" lower="0.0" upper="0.04" velocity="0.2"/>
+    </joint>
+    <joint name="finger_joint2" type="prismatic">
+      <!-- <safety_controller k_position="100.0" k_velocity="40.0" soft_lower_limit="0" soft_upper_limit="0.3"/> -->
+      <parent link="link7"/>
+      <child link="rightfinger"/>
+      <origin xyz="0 0 0.1654" rpy="0 0 -0.78539816339"/>
+      <axis xyz="0 1 0"/>
+      <calibration rising="-0.02" />
+      <limit effort="20" lower="0.0" upper="0.04" velocity="0.2"/>
+      <!-- <mimic joint="finger_joint1" /> -->
+    </joint>
 </robot>

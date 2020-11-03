@@ -74,17 +74,17 @@ int main() {
 	auto leg = new Sai2Model::Sai2Model(leg_file, false);
 	leg->_q = redis_client.getEigenMatrixJSON(LEG_JOINT_ANGLES_KEY);
 	VectorXd initial_leg_q = leg->_q;
-	leg->updateModel();
 
 	cout << "leg->_q = " << leg->_q << "\n";
 
 	// prepare controller
+	cout << "robot->dof() = " << robot->dof() << "\n";
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
 
 	// pose task
-	const string control_link = "leftfinger";
+	const string control_link = "link7";
 	const Vector3d control_point = Vector3d(0,0,0.07);
 	auto posori_task = new Sai2Primitives::PosOriTask(robot, control_link, control_point);
 
@@ -95,6 +95,7 @@ int main() {
 	// task position
 	Vector3d X;
 	robot->position(X, control_link, control_point);
+	// posori_task->_desired_position = X;
 
 	// Frame transformation from the leg to the world frame
 	Vector3d T_world_leg;
@@ -131,13 +132,10 @@ int main() {
 	joint_task->_kv = 15.0;
 
 	VectorXd q_init_desired = initial_q;
-	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0, 0.0, 0.0;
-	//q_init_desired << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+	// q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
+	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
 	q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
-
-	// posori task
-	posori_task->_desired_position = Vector3d(0,0,0);
 
 	// create a timer
 	LoopTimer timer;
@@ -145,7 +143,7 @@ int main() {
 	timer.setLoopFrequency(1000);
 	double start_time = timer.elapsedTime(); //secs
 	bool fTimerDidSleep = true;
-	int state = POSORI_CONTROLLER;
+	int state = JOINT_CONTROLLER;
 
 	int count = 0;
 
@@ -196,14 +194,12 @@ int main() {
 			Vector3d pos;
 			robot->position(pos, control_link, control_point);
 
-			posori_task->_desired_position = Vector3d(0.2, 0.2, 0.2);
-
 			// cout << "X = " << X << "\n";
 			// cout << "pos = " << pos << "\n";
 
 			if( (pos - X).norm() < 0.15 )
 			{
-				cout << "Made it to position X. Updating X";
+				// cout << "Made it to position X. Updating X";
 				// X << 0.3, 0.3, 0.3;
 				count += 1;
 				// double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) + (75.0*M_PI/180);
@@ -229,8 +225,8 @@ int main() {
 				// X = X - T_world_leg;
 				// X = X + T_world_robot;
 
-				posori_task->reInitializeTask();
-				posori_task->_desired_position = X;
+				// posori_task->reInitializeTask();
+				// posori_task->_desired_position = X;
 			}
 
 			// compute torques
@@ -238,15 +234,19 @@ int main() {
 			joint_task->computeTorques(joint_task_torques);
 
 			command_torques = posori_task_torques + joint_task_torques;
-			// command_torques(7) = 0.0;
-			// command_torques(8) = 0.0;
+			// command_torques = posori_task_torques;
 
-
-
+			// command_torques[7] = 0;
+			// command_torques[8] = 0;
 		}
 
+		// Make a vector of 9 torques to send to the robot with the hand
+		VectorXd command_torques_hand(9);
+		command_torques_hand << command_torques, 0.0, 0.0;
+
 		// send to redis
-		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
+		// redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
+		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques_hand);
 
 		controller_counter++;
 	}

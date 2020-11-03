@@ -2,9 +2,9 @@
 
 <world name="demo_world" gravity="0.0 0.0 -9.81">
 
-	<robot name="panda_arm">
+	<robot name="panda_arm_hand">
 		<origin xyz="0.5 -0.4 0.05" rpy="0 0 1.57" />
-		<model dir="./resources" path="panda_arm.urdf" name="panda_arm" />
+		<model dir="./resources" path="panda_arm_hand.urdf" name="panda_arm_hand" />
 	</robot>
 
 	<robot name="human_leg">
