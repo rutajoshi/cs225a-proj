@@ -108,13 +108,18 @@ int main() {
 	robot->position(X, control_link, control_point);
 	// posori_task->_desired_position = X;
 
-	// Frame transformation from the leg to the world frame
+	// Frame transformation from the world to leg frame
 	Vector3d T_world_leg;
 	T_world_leg << 1.25, 0.0, 0.15;
+	Matrix3d R_world_leg = Matrix3d::Identity();
 
-	// // Frame transformation from the world to the robot frame
+	// // Frame transformation from the world to robot frame
 	Vector3d T_world_robot;
 	T_world_robot << 0.5, -0.4, 0.05;
+	Matrix3d R_world_robot;
+	R_world_robot << 0, -1, 0,
+									 1, 0, 0,
+									 0, 0, 1;
 
 
 #ifdef USING_OTG
@@ -210,6 +215,8 @@ int main() {
 			Vector3d pos;
 			robot->position(pos, control_link, control_point);
 
+			double vertical_offset = 0.2;
+
 			// cout << "X = " << X << "\n";
 			// cout << "pos = " << pos << "\n";
 
@@ -220,29 +227,34 @@ int main() {
 				count += 1;
 				// double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) + (75.0*M_PI/180);
 				// double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
-				// double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (15.0*M_PI/180);
-				// double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
+				double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (15.0*M_PI/180);
+				double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
 
-				double q1 = (30.0/180)*M_PI; // -60, -30, 0, 30;
-				double q2 = (-120.0/180)*M_PI; // -60, -80, -100, -120
+				// double q1 = (30.0/180)*M_PI; // -60, -30, 0, 30;
+				// double q2 = (-120.0/180)*M_PI; // -60, -80, -100, -120
 
 				// X(0) = l1 * cos(q1) + l2 * cos(q1 + q2);
 				// X(1) = l1 * sin(q1) + l2 * sin(q1 + q2);
 				// X(2) = 0.0;
 
-				// X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
-				// X(1) = 0.0;
-				// X(2) = l1 * cos(q1) + l2 * cos(q1 + q2);
+				X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
+				X(1) = 0.0;
+				X(2) = l1 * cos(q1) + l2 * cos(q1 + q2) + vertical_offset;
 
 				// original qs are in base-of-leg frame
 				// 1. transform from leg to world frame (subtract world->leg)
+				X = X - T_world_leg;
+				X = R_world_leg * X;
+
 				// 2. transform from world to robot frame (add world->robot)
+				X = X + T_world_robot;
+				X = R_world_robot * X;
 
-				// X = X - T_world_leg;
-				// X = X + T_world_robot;
+				// 3. Transform from robot base frame to EE frame
 
-				// posori_task->reInitializeTask();
-				// posori_task->_desired_position = X;
+
+				posori_task->reInitializeTask();
+				posori_task->_desired_position = X;
 			}
 
 			// compute torques

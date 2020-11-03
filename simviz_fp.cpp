@@ -76,8 +76,8 @@ int main() {
 	auto graphics = new Sai2Graphics::Sai2Graphics(world_file, true);
 	Eigen::Vector3d camera_pos, camera_lookat, camera_vertical;
 	graphics->getCameraPose(camera_name, camera_pos, camera_vertical, camera_lookat);
-	graphics->showLinkFrame(true, leg_name, leg_link_name, 0.15);
-	// graphics->showLinkFrame(true, leg_name, "link0", 0.15);
+	graphics->showLinkFrame(true, leg_name, "link0", 0.15);
+	graphics->showLinkFrame(true, robot_name, "link0", 0.15);
 	graphics->_world->m_backgroundColor.setWhite();
 
 	// load robots
