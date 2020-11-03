@@ -96,6 +96,7 @@
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <cylinder radius="0.05" length="0.5"/>
+          <!-- <mesh filename="../../../model/final_project/meshes/visual/footlink.obj"/> -->
         </geometry>
         <material name="green">
           <color rgba="0 1 0 1"/>
