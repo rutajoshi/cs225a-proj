@@ -30,6 +30,8 @@ int state = POSORI_CONTROLLER;
 // - read:
 std::string JOINT_ANGLES_KEY;
 std::string JOINT_VELOCITIES_KEY;
+std::string GRIPPER_JOINT_ANGLES_KEY;
+std::string GRIPPER_JOINT_VELOCITIES_KEY;
 std::string JOINT_TORQUES_SENSED_KEY;
 std::string LEG_JOINT_ANGLES_KEY;
 // - write
@@ -52,6 +54,8 @@ int main() {
 
 	JOINT_ANGLES_KEY = "sai2::cs225a::panda_robot::sensors::q";
 	LEG_JOINT_ANGLES_KEY = "sai2::cs225a::leg_robot::sensors::q"; // added
+	GRIPPER_JOINT_ANGLES_KEY = "sai2::cs225a::gripper::sensors::q";
+	GRIPPER_JOINT_VELOCITIES_KEY = "sai2::cs225a::gripper::sensors::dq";
 	JOINT_VELOCITIES_KEY = "sai2::cs225a::panda_robot::sensors::dq";
 	JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::panda_robot::actuators::fgc";
 
@@ -70,6 +74,11 @@ int main() {
 	VectorXd initial_q = robot->_q;
 	robot->updateModel();
 
+	// load gripper
+	Vector2d gripper_pos, gripper_vel;
+	gripper_pos = redis_client.getEigenMatrixJSON(GRIPPER_JOINT_ANGLES_KEY);
+	gripper_vel = redis_client.getEigenMatrixJSON(GRIPPER_JOINT_VELOCITIES_KEY);
+
 	// load human leg
 	auto leg = new Sai2Model::Sai2Model(leg_file, false);
 	leg->_q = redis_client.getEigenMatrixJSON(LEG_JOINT_ANGLES_KEY);
@@ -81,6 +90,8 @@ int main() {
 	cout << "robot->dof() = " << robot->dof() << "\n";
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
+	Vector2d command_torques_hand = Vector2d::Zero();
+	VectorXd command_torques_full = VectorXd::Zero(9); // make a vector of 9 torques to send to the robot with the hand
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
 
 	// pose task
@@ -133,8 +144,9 @@ int main() {
 
 	VectorXd q_init_desired = initial_q;
 	// q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
-	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
-	q_init_desired *= M_PI/180.0;
+	// VectorXd q_init_desired = VectorXd(dof);
+	// q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
+	// q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
 
 	// create a timer
@@ -158,6 +170,10 @@ int main() {
 
 		// update model
 		robot->updateModel();
+
+		// read gripper state from redis
+		gripper_pos = redis_client.getEigenMatrixJSON(GRIPPER_JOINT_ANGLES_KEY);
+		gripper_vel = redis_client.getEigenMatrixJSON(GRIPPER_JOINT_VELOCITIES_KEY);
 
 		if(state == JOINT_CONTROLLER)
 		{
@@ -236,17 +252,18 @@ int main() {
 			command_torques = posori_task_torques + joint_task_torques;
 			// command_torques = posori_task_torques;
 
-			// command_torques[7] = 0;
-			// command_torques[8] = 0;
+			// GRIPPER CONTROLLER
+			Vector2d gripper_pos_des = Vector2d::Zero();
+			gripper_pos_des(0) = 0.05 + 0.05 * sin(time);
+			gripper_pos_des(1) = -0.05 - 0.05 * sin(time);
+			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
+			// command_torques_hand = -10.0 * gripper_vel; // -10.0 is kv
 		}
-
-		// Make a vector of 9 torques to send to the robot with the hand
-		VectorXd command_torques_hand(9);
-		command_torques_hand << command_torques, 0.0, 0.0;
 
 		// send to redis
 		// redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
-		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques_hand);
+		command_torques_full << command_torques, command_torques_hand;
+		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques_full);
 
 		controller_counter++;
 	}

@@ -29,6 +29,8 @@ const string camera_name = "camera_fixed";
 // - write:
 const std::string JOINT_ANGLES_KEY = "sai2::cs225a::panda_robot::sensors::q";
 const std::string JOINT_VELOCITIES_KEY = "sai2::cs225a::panda_robot::sensors::dq";
+const std::string GRIPPER_JOINT_ANGLES_KEY = "sai2::cs225a::gripper::sensors::q";
+const std::string GRIPPER_JOINT_VELOCITIES_KEY = "sai2::cs225a::gripper::sensors::dq";
 const std::string LEG_JOINT_ANGLES_KEY = "sai2::cs225a::leg_robot::sensors::q";
 const std::string LEG_JOINT_VELOCITIES_KEY = "sai2::cs225a::leg_robot::sensors::dq";
 // - read
@@ -285,8 +287,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 		leg->updateKinematics();
 
 		// write new robot state to redis
-		redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q);
-		redis_client.setEigenMatrixJSON(JOINT_VELOCITIES_KEY, robot->_dq);
+		redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q.head(7));
+		redis_client.setEigenMatrixJSON(JOINT_VELOCITIES_KEY, robot->_dq.head(7));
+		redis_client.setEigenMatrixJSON(GRIPPER_JOINT_ANGLES_KEY, robot->_q.tail(2));
+		redis_client.setEigenMatrixJSON(GRIPPER_JOINT_VELOCITIES_KEY, robot->_dq.tail(2));
 		redis_client.setEigenMatrixJSON(LEG_JOINT_ANGLES_KEY, leg->_q);
 		redis_client.setEigenMatrixJSON(LEG_JOINT_VELOCITIES_KEY, leg->_dq);
 
