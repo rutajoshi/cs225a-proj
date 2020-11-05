@@ -100,8 +100,9 @@ int main() {
 	sim->getJointPositions(robot_name, robot->_q);
 	sim->getJointVelocities(robot_name, robot->_dq);
 	// cout << "ROBOT Q BEFORE CHANGE: " << robot->_q << "\n";
-	robot->_q[7] = 0.09;
-	robot->_q[8] = -0.09;
+	robot->_q[3] = -M_PI/6.0; // move EE up away from leg using link4
+	robot->_q[7] = 0.09; // start with open gripper
+	robot->_q[8] = -0.09; // start with open gripper
 	sim->setJointPositions(robot_name, robot->_q);
 	// cout << "ROBOT Q AFTER CHANGE: " << robot->_q << "\n";
 	robot->updateKinematics();

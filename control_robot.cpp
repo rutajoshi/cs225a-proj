@@ -22,9 +22,10 @@ const string robot_file = "./resources/panda_arm.urdf";
 const string leg_file = "./resources/human_leg.urdf";
 
 #define JOINT_CONTROLLER      0
-#define POSORI_CONTROLLER     1
+#define PICKUP_CONTROLLER			1
+#define POSORI_CONTROLLER     2
 
-int state = POSORI_CONTROLLER;
+int state = JOINT_CONTROLLER;
 
 // redis keys:
 // - read:
@@ -72,7 +73,8 @@ int main() {
 	auto robot = new Sai2Model::Sai2Model(robot_file, false);
 	robot->_q = redis_client.getEigenMatrixJSON(JOINT_ANGLES_KEY);
 	VectorXd initial_q = robot->_q;
-	initial_q[6] = 0.0;
+	cout << "Original initial_q = " << initial_q << "\n";
+	initial_q[6] = -35.0*M_PI/180.0;
 	robot->updateModel();
 
 	// load gripper
@@ -97,7 +99,7 @@ int main() {
 
 	// pose task
 	const string control_link = "link7";
-	const Vector3d control_point = Vector3d(0,0,0.2); //Vector3d(0,0,0.07);
+	const Vector3d control_point = Vector3d(0,0,0.15); //Vector3d(0,0,0.07);
 	auto posori_task = new Sai2Primitives::PosOriTask(robot, control_link, control_point);
 
 	// Set initial q1 and q2
@@ -181,6 +183,9 @@ int main() {
 		gripper_pos = redis_client.getEigenMatrixJSON(GRIPPER_JOINT_ANGLES_KEY);
 		gripper_vel = redis_client.getEigenMatrixJSON(GRIPPER_JOINT_VELOCITIES_KEY);
 
+		// Set desired orientation for gripping the leg
+		Matrix3d rot_pickup_desired;
+
 		if(state == JOINT_CONTROLLER)
 		{
 			// update task model and set hierarchy
@@ -189,20 +194,59 @@ int main() {
 
 			// compute torques
 			joint_task->computeTorques(joint_task_torques);
-
 			command_torques = joint_task_torques;
+
+			// 1. Position the EE above the leg in same plane as leg
+			double vertical_offset = 0.4;
+			X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
+			X(1) = 0.0;
+			X(2) = l1 * cos(q1) + l2 * cos(q1 + q2) + vertical_offset;
+			// 1. transform from leg to world frame (subtract world->leg)
+			X = X - T_world_leg;
+			X = R_world_leg * X;
+			// 2. transform from world to robot frame (add world->robot)
+			X = X + T_world_robot;
+			X = R_world_robot * X;
+
+			// Now calculate desired orientation for gripping - does the order matter??
+			rot_pickup_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitZ()).toRotationMatrix();
 
 			if( (robot->_q - q_init_desired).norm() < 0.15 )
 			{
 				posori_task->reInitializeTask();
-				posori_task->_desired_position += Vector3d(-0.0,0.0,0.0);
-				posori_task->_desired_orientation = AngleAxisd(M_PI/6, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
+				posori_task->_desired_position = X;
+
+				posori_task->_desired_orientation = rot_pickup_desired;
+				// posori_task->_desired_position += Vector3d(-0.0,0.0,0.0);
+				// posori_task->_desired_orientation = AngleAxisd(M_PI/6, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
 
 				joint_task->reInitializeTask();
 				joint_task->_kp = 0;
 
-				state = POSORI_CONTROLLER;
+				// state = POSORI_CONTROLLER;
+				state = PICKUP_CONTROLLER;
 			}
+		}
+
+		else if (state == PICKUP_CONTROLLER) {
+			cout << "hi";
+
+			Vector3d pos;
+			robot->position(pos, control_link, control_point);
+
+			Matrix3d rot;
+			robot->rotation(rot, control_link);
+
+			if ((pos - X).norm() < 0.15 && (rot - rot_pickup_desired).norm() < 0.15) {
+				// Do stuff
+				cout << "\n";
+			}
+
+			// 1. Move the EE down until link7 collides with leg --> do this in JOINT_CONTROLLER
+
+			// 2. Close the gripper around the leg
+
+			state = POSORI_CONTROLLER;
 		}
 
 		else if(state == POSORI_CONTROLLER)
@@ -218,25 +262,11 @@ int main() {
 
 			double vertical_offset = 0.2;
 
-			// cout << "X = " << X << "\n";
-			// cout << "pos = " << pos << "\n";
-
 			if( (pos - X).norm() < 0.15 )
 			{
-				// cout << "Made it to position X. Updating X";
-				// X << 0.3, 0.3, 0.3;
 				count += 1;
-				// double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) + (75.0*M_PI/180);
-				// double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
 				double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (15.0*M_PI/180);
 				double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
-
-				// double q1 = (30.0/180)*M_PI; // -60, -30, 0, 30;
-				// double q2 = (-120.0/180)*M_PI; // -60, -80, -100, -120
-
-				// X(0) = l1 * cos(q1) + l2 * cos(q1 + q2);
-				// X(1) = l1 * sin(q1) + l2 * sin(q1 + q2);
-				// X(2) = 0.0;
 
 				X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
 				X(1) = 0.0;
@@ -250,9 +280,6 @@ int main() {
 				// 2. transform from world to robot frame (add world->robot)
 				X = X + T_world_robot;
 				X = R_world_robot * X;
-
-				// 3. Transform from robot base frame to EE frame
-
 
 				posori_task->reInitializeTask();
 				posori_task->_desired_position = X;
