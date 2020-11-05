@@ -99,7 +99,13 @@ int main() {
 	// read joint positions, velocities, update model
 	sim->getJointPositions(robot_name, robot->_q);
 	sim->getJointVelocities(robot_name, robot->_dq);
+	// cout << "ROBOT Q BEFORE CHANGE: " << robot->_q << "\n";
+	robot->_q[7] = 0.09;
+	robot->_q[8] = -0.09;
+	sim->setJointPositions(robot_name, robot->_q);
+	// cout << "ROBOT Q AFTER CHANGE: " << robot->_q << "\n";
 	robot->updateKinematics();
+	// cout << "ROBOT Q AFTER UPDATE: " << robot->_q << "\n";
 
 	sim->setJointPositions(leg_name, leg->_q);
 	sim->setJointVelocities(leg_name, leg->_dq);
