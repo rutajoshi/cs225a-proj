@@ -21,11 +21,10 @@ using namespace Eigen;
 const string robot_file = "./resources/panda_arm.urdf";
 const string leg_file = "./resources/human_leg.urdf";
 
-#define JOINT_CONTROLLER      0
-#define PICKUP_CONTROLLER			1
-#define POSORI_CONTROLLER     2
-
-int state = JOINT_CONTROLLER;
+#define PRE_APPROACH_CONTROLLER	0
+#define APPROACH_CONTROLLER			1
+#define GRIP_CONTROLLER					2
+#define TRAJECTORY_CONTROLLER		3
 
 // redis keys:
 // - read:
@@ -74,7 +73,7 @@ int main() {
 	robot->_q = redis_client.getEigenMatrixJSON(JOINT_ANGLES_KEY);
 	VectorXd initial_q = robot->_q;
 	cout << "Original initial_q = " << initial_q << "\n";
-	initial_q[6] = -35.0*M_PI/180.0;
+	initial_q[6] = -35.0*M_PI/180.0; // Rotate link7 to be perpendicular to camera
 	robot->updateModel();
 
 	// load gripper
@@ -86,11 +85,9 @@ int main() {
 	auto leg = new Sai2Model::Sai2Model(leg_file, false);
 	leg->_q = redis_client.getEigenMatrixJSON(LEG_JOINT_ANGLES_KEY);
 	VectorXd initial_leg_q = leg->_q;
-
 	cout << "leg->_q = " << leg->_q << "\n";
 
 	// prepare controller
-	cout << "robot->dof() = " << robot->dof() << "\n";
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
 	Vector2d command_torques_hand = Vector2d::Zero();
@@ -109,7 +106,6 @@ int main() {
 	// task position
 	Vector3d X;
 	robot->position(X, control_link, control_point);
-	// posori_task->_desired_position = X;
 
 	// Frame transformation from the world to leg frame
 	Vector3d T_world_leg;
@@ -150,11 +146,8 @@ int main() {
 	joint_task->_kp = 250.0;
 	joint_task->_kv = 15.0;
 
+	// Set initial q position to that which is specified in simviz
 	VectorXd q_init_desired = initial_q;
-	// q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
-	// VectorXd q_init_desired = VectorXd(dof);
-	// q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
-	// q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
 
 	// create a timer
@@ -163,9 +156,28 @@ int main() {
 	timer.setLoopFrequency(1000);
 	double start_time = timer.elapsedTime(); //secs
 	bool fTimerDidSleep = true;
-	int state = JOINT_CONTROLLER;
+	int state = PRE_APPROACH_CONTROLLER;
 
+	// Helper variables
 	int count = 0;
+	Matrix3d rot_desired = Matrix3d::Identity();
+
+	// Pre-approach desired position and orientation
+	// *** Set the desired position to be above the grip point ***
+	// 1. Get X in leg frame
+	double vertical_offset = 0.0;
+	X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
+	X(1) = 0.0;
+	X(2) = l1 * cos(q1) + l2 * cos(q1 + q2) + vertical_offset;
+	// 2. Transform to world frame
+	X = X - T_world_leg;
+	X = R_world_leg.inverse() * X;
+	// 3. Transform to robot base frame
+	X = X + T_world_robot;
+	X = R_world_robot * X;
+	// *** Set the desired orientation to be perpendicular to the leg ***
+	rot_desired = AngleAxisd(-(q1 + q2 - M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
+	rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
 
 	while (runloop) {
 		// wait for next scheduled loop
@@ -183,10 +195,7 @@ int main() {
 		gripper_pos = redis_client.getEigenMatrixJSON(GRIPPER_JOINT_ANGLES_KEY);
 		gripper_vel = redis_client.getEigenMatrixJSON(GRIPPER_JOINT_VELOCITIES_KEY);
 
-		// Set desired orientation for gripping the leg
-		Matrix3d rot_pickup_desired;
-
-		if(state == JOINT_CONTROLLER)
+		if(state == PRE_APPROACH_CONTROLLER)
 		{
 			// update task model and set hierarchy
 			N_prec.setIdentity();
@@ -196,61 +205,74 @@ int main() {
 			joint_task->computeTorques(joint_task_torques);
 			command_torques = joint_task_torques;
 
-			// 1. Position the EE above the leg in same plane as leg
-			double vertical_offset = 0.4;
-			X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
-			X(1) = 0.0;
-			X(2) = l1 * cos(q1) + l2 * cos(q1 + q2) + vertical_offset;
-			// 1. transform from leg to world frame (subtract world->leg)
-			X = X - T_world_leg;
-			X = R_world_leg * X;
-			// 2. transform from world to robot frame (add world->robot)
-			X = X + T_world_robot;
-			X = R_world_robot * X;
+			// cout << "In the pre-approach controller\n";
 
-			// Now calculate desired orientation for gripping - does the order matter??
-			rot_pickup_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitZ()).toRotationMatrix();
+			if ((robot->_q - q_init_desired).norm() < 0.15) {
+				cout << "Reached initial robot position. Setting pre-approach posori desired.\n";
 
-			if( (robot->_q - q_init_desired).norm() < 0.15 )
-			{
 				posori_task->reInitializeTask();
-				posori_task->_desired_position = X;
+				posori_task->_desired_position = X; // Updated X to approach position
+				posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
 
-				posori_task->_desired_orientation = rot_pickup_desired;
-				// posori_task->_desired_position += Vector3d(-0.0,0.0,0.0);
-				// posori_task->_desired_orientation = AngleAxisd(M_PI/6, Vector3d::UnitX()).toRotationMatrix() * posori_task->_desired_orientation;
-
-				joint_task->reInitializeTask();
-				joint_task->_kp = 0;
-
-				// state = POSORI_CONTROLLER;
-				state = PICKUP_CONTROLLER;
+				// Go to next controller
+				state = APPROACH_CONTROLLER;
 			}
+
+			// compute torques
+			posori_task->computeTorques(posori_task_torques);
+			joint_task->computeTorques(joint_task_torques);
+			command_torques = posori_task_torques + joint_task_torques;
+
+			// compute gripper torques
+			Vector2d gripper_pos_des = Vector2d::Zero();
+			gripper_pos_des(0) = 0.09;
+			gripper_pos_des(1) = -0.09;
+			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
+
 		}
 
-		else if (state == PICKUP_CONTROLLER) {
-			cout << "hi";
+		else if (state == APPROACH_CONTROLLER) {
+			// cout << "APPROACH_CONTROLLER\n";
 
+			// update task model and set hierarchy
+			N_prec.setIdentity();
+			posori_task->updateTaskModel(N_prec);
+			N_prec = posori_task->_N;
+			joint_task->updateTaskModel(N_prec);
+
+			// Maybe don't need this
+			// posori_task->reInitializeTask();
+			posori_task->_desired_position = X; // Updated X to approach position
+			posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
+
+			// Continue until you reach the approach position
 			Vector3d pos;
 			robot->position(pos, control_link, control_point);
-
 			Matrix3d rot;
 			robot->rotation(rot, control_link);
-
-			if ((pos - X).norm() < 0.15 && (rot - rot_pickup_desired).norm() < 0.15) {
-				// Do stuff
-				cout << "\n";
+			if ((pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15) {
+				cout << "Reached approach position.";
 			}
 
-			// 1. Move the EE down until link7 collides with leg --> do this in JOINT_CONTROLLER
+			// compute torques
+			posori_task->computeTorques(posori_task_torques);
+			joint_task->computeTorques(joint_task_torques);
+			command_torques = posori_task_torques + joint_task_torques;
 
-			// 2. Close the gripper around the leg
-
-			state = POSORI_CONTROLLER;
+			// compute gripper torques
+			Vector2d gripper_pos_des = Vector2d::Zero();
+			gripper_pos_des(0) = 0.09;
+			gripper_pos_des(1) = -0.09;
+			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
 		}
 
-		else if(state == POSORI_CONTROLLER)
+		else if (state == GRIP_CONTROLLER) {
+			cout << "GRIP_CONTROLLER\n";
+		}
+
+		else if(state == TRAJECTORY_CONTROLLER)
 		{
+			cout << "TRAJECTORY_CONTROLLER\n";
 			// update task model and set hierarchy
 			N_prec.setIdentity();
 			posori_task->updateTaskModel(N_prec);
@@ -264,6 +286,7 @@ int main() {
 
 			if( (pos - X).norm() < 0.15 )
 			{
+				cout << "Gripped leg, following trajectory.\n";
 				count += 1;
 				double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (15.0*M_PI/180);
 				double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
@@ -301,6 +324,7 @@ int main() {
 		}
 
 		// send to redis
+		// cout << "Sending torques to redis\n";
 		// redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
 		command_torques_full << command_torques, command_torques_hand;
 		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques_full);
