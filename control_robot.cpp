@@ -180,7 +180,8 @@ int main() {
 	// rot_desired = AngleAxisd(-(q1 + q2 - M_PI/2.0) + (-35.0*M_PI/180), Vector3d::UnitY()).toRotationMatrix();
 	rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
 	rot_desired *= AngleAxisd(-M_PI, Vector3d::UnitX()).toRotationMatrix();
-	rot_desired *= AngleAxisd(M_PI/2.0 + (-35.0*M_PI/180), Vector3d::UnitZ()).toRotationMatrix();
+	rot_desired *= AngleAxisd(M_PI, Vector3d::UnitZ()).toRotationMatrix();
+	// rot_desired *= AngleAxisd(M_PI/2.0 + (-35.0*M_PI/180), Vector3d::UnitZ()).toRotationMatrix();
 	rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
 
 	while (runloop) {

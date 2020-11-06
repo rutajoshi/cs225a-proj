@@ -78,6 +78,7 @@ int main() {
 	graphics->getCameraPose(camera_name, camera_pos, camera_vertical, camera_lookat);
 	graphics->showLinkFrame(true, leg_name, "link0", 0.15);
 	graphics->showLinkFrame(true, robot_name, "link0", 0.15);
+	graphics->showLinkFrame(true, robot_name, "link6", 0.15);
 	graphics->showLinkFrame(true, robot_name, "link7", 0.15);
 	graphics->_world->m_backgroundColor.setWhite();
 
