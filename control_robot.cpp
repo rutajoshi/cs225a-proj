@@ -73,7 +73,7 @@ int main() {
 	robot->_q = redis_client.getEigenMatrixJSON(JOINT_ANGLES_KEY);
 	VectorXd initial_q = robot->_q;
 	cout << "Original initial_q = " << initial_q << "\n";
-	initial_q[6] = -35.0*M_PI/180.0; // Rotate link7 to be perpendicular to camera
+	// initial_q[6] = -35.0*M_PI/180.0; // Rotate link7 to be perpendicular to camera
 	robot->updateModel();
 
 	// load gripper
@@ -96,7 +96,7 @@ int main() {
 
 	// pose task
 	const string control_link = "link7";
-	const Vector3d control_point = Vector3d(0,0,0.15); //Vector3d(0,0,0.07);
+	const Vector3d control_point = Vector3d(0,0,0.07); //Vector3d(0,0,0.07);
 	auto posori_task = new Sai2Primitives::PosOriTask(robot, control_link, control_point);
 
 	// Set initial q1 and q2
@@ -165,10 +165,11 @@ int main() {
 	// Pre-approach desired position and orientation
 	// *** Set the desired position to be above the grip point ***
 	// 1. Get X in leg frame
-	double vertical_offset = 0.0;
+	double vertical_offset = 0.6;
 	X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
 	X(1) = 0.0;
 	X(2) = l1 * cos(q1) + l2 * cos(q1 + q2) + vertical_offset;
+	// X << 0.0, 0.0, 0.0;
 	// 2. Transform to world frame
 	X = X - T_world_leg;
 	X = R_world_leg.inverse() * X;
@@ -176,7 +177,10 @@ int main() {
 	X = X + T_world_robot;
 	X = R_world_robot * X;
 	// *** Set the desired orientation to be perpendicular to the leg ***
-	rot_desired = AngleAxisd(-(q1 + q2 - M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
+	// rot_desired = AngleAxisd(-(q1 + q2 - M_PI/2.0) + (-35.0*M_PI/180), Vector3d::UnitY()).toRotationMatrix();
+	rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
+	rot_desired *= AngleAxisd(-M_PI, Vector3d::UnitX()).toRotationMatrix();
+	rot_desired *= AngleAxisd(M_PI/2.0 + (-35.0*M_PI/180), Vector3d::UnitZ()).toRotationMatrix();
 	rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
 
 	while (runloop) {
