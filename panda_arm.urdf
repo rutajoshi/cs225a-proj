@@ -131,23 +131,23 @@
           <mesh filename="../../../model/panda/meshes/visual/link7.obj"/>
         </geometry>
       </visual>
-      <!-- <collision>
+      <collision>
         <geometry>
           <mesh filename="../../../model/panda/meshes/collision/link7.obj"/>
         </geometry>
-      </collision> -->
+      </collision>
       <visual>
         <origin xyz="0 0 0.107" rpy="0 0 -0.78539816339" />
         <geometry>
           <mesh filename="../../../model/panda/meshes/visual/hand.obj"/>
         </geometry>
       </visual>
-<!--       <collision>
+      <collision>
         <origin xyz="0 0 0.107" rpy="0 0 -0.78539816339" />
         <geometry>
           <mesh filename="../../../model/panda/meshes/collision/hand.obj"/>
         </geometry>
-      </collision> -->
+      </collision>
     </link>
 
     <joint name="joint1" type="revolute">

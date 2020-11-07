@@ -95,7 +95,8 @@ int main() {
 	cout << "leg->_q = " << leg->_q << "\n";
 
 	// load force sensor
-	const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.1);
+	// const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.1);
+	// const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.1);
 	Eigen::Vector3d sensed_force;
 	Eigen::Vector3d sensed_moment;
 	sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
@@ -285,25 +286,26 @@ int main() {
 			robot->position(pos, control_link, control_point);
 			Matrix3d rot;
 			robot->rotation(rot, control_link);
-			if ((pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15) {
-				if (sensed_force.norm() > 1.0){
-					state = GRIP_CONTROLLER;
-				}
-				else{
-					// cout << "Reached approach position.";
-					// Vector between the control point on the leg and the current position
-					// 3. Transform the position to the robot base frame
-					pos = pos + T_world_robot;
-					pos = R_world_robot * pos;
-					// Vector3d position_increment = (leg_point - pos)*0.1;
-					Vector3d position_increment;
-					position_increment << 0.0, 0.0, -0.1;
-					X += position_increment;
 
-					posori_task->_desired_position = X; // Updated X to approach position
-					cout << posori_task->_desired_position << "\n";
-					posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
-				}
+			cout << sensed_force << "\n";
+			if (sensed_force.norm() > 1.0){
+				state = GRIP_CONTROLLER;
+			}
+
+			else if ((pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15) {
+				// cout << "Reached approach position.";
+				// Vector between the control point on the leg and the current position
+				// 3. Transform the position to the robot base frame
+				pos = pos + T_world_robot;
+				pos = R_world_robot * pos;
+				// Vector3d position_increment = (leg_point - pos)*0.1;
+				Vector3d position_increment;
+				position_increment << 0.0, 0.0, -0.1;
+				X += position_increment;
+
+				posori_task->_desired_position = X; // Updated X to approach position
+				// cout << posori_task->_desired_position << "\n";
+				posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
 			}
 
 			// compute torques

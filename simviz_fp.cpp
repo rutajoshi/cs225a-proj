@@ -51,7 +51,7 @@ ForceSensorSim* force_sensor;
 ForceSensorDisplay* force_display;
 
 // simulation function prototype
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim);
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim, ForceSensorSim* force_sensor);
 
 // callback to print glfw errors
 void glfwError(int error, const char* description);
@@ -71,6 +71,10 @@ bool fTransZp = false;
 bool fTransZn = false;
 bool fRotPanTilt = false;
 
+const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.0);
+Eigen::Vector3d sensed_force;
+Eigen::Vector3d sensed_moment;
+
 int main() {
 	cout << "Loading URDF world model file: " << world_file << endl;
 
@@ -89,7 +93,7 @@ int main() {
 	graphics->getCameraPose(camera_name, camera_pos, camera_vertical, camera_lookat);
 	graphics->showLinkFrame(true, leg_name, "link0", 0.15);
 	graphics->showLinkFrame(true, robot_name, "link0", 0.15);
-	graphics->showLinkFrame(true, robot_name, "link6", 0.15);
+	// graphics->showLinkFrame(true, robot_name, "link6", 0.15);
 	graphics->showLinkFrame(true, robot_name, "link7", 0.15);
 	graphics->_world->m_backgroundColor.setWhite();
 
@@ -130,7 +134,11 @@ int main() {
 	// force_sensor_tranform[0][3] = 0.0;
 	// force_sensor_tranform[1][3] = 0.0;
 	// force_sensor_tranform[2][3] = 0.1; // this is the position of the force sensor
-	force_sensor = new ForceSensorSim(robot_name, "link7", Eigen::Affine3d::Identity(), robot);
+	Eigen::Affine3d transform_sensor = Eigen::Affine3d::Identity();
+	transform_sensor.translation() = sensor_pos_in_link;
+	force_sensor = new ForceSensorSim(robot_name, "link7", transform_sensor, robot);
+	// force_sensor = new ForceSensorSim(robot_name, "link7", Eigen::Affine3d::Identity(), robot);
+	// force_sensor = new ForceSensorSim(robot_name, "leftfinger", transform_sensor, robot);
 	force_display = new ForceSensorDisplay(force_sensor, graphics);
 
 	/*------- Set up visualization -------*/
@@ -164,12 +172,16 @@ int main() {
 	glfwSetKeyCallback(window, keySelect);
 	glfwSetMouseButtonCallback(window, mouseClick);
 
+	// init click force widget
+	// auto ui_force_widget1 = new UIForceWidget(robot_name, robot, graphics);
+	// ui_force_widget->setEnable(false);
+
 	// cache variables
 	double last_cursorx, last_cursory;
 
 	redis_client.set(CONTROLLER_RUNNING_KEY, "0");
 	fSimulationRunning = true;
-	thread sim_thread(simulation, robot, leg, sim);
+	thread sim_thread(simulation, robot, leg, sim, force_sensor);
 
 	// while window is open:
 	while (fSimulationRunning)
@@ -181,6 +193,9 @@ int main() {
 		graphics->updateGraphics(robot_name, robot);
 		graphics->updateGraphics(leg_name, leg);
 		graphics->render(camera_name, width, height);
+
+		// display force
+		force_display->update();
 
 		// swap buffers
 		glfwSwapBuffers(window);
@@ -267,7 +282,7 @@ int main() {
 }
 
 //------------------------------------------------------------------------------
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim)
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim, ForceSensorSim* fsensor1)
 {
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
@@ -304,6 +319,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 
 		// read arm torques from redis
 		command_torques = redis_client.getEigenMatrixJSON(TORQUES_COMMANDED_KEY);
+
+		// get forces from interactive screen
+		// ui_force_widget->getUIForce(ui_force);
+		// ui_force_widget->getUIJointTorques(ui_force_command_torques);
 
 		// set torques to simulation
 		sim->setJointTorques(robot_name, command_torques + gravity);
