@@ -7,6 +7,10 @@
 #include "timer/LoopTimer.h"
 #include "Sai2Primitives.h"
 
+// added force sensor
+#include "force_sensor/ForceSensorSim.h"
+#include "force_sensor/ForceSensorDisplay.h"
+
 #include <iostream>
 #include <string>
 
@@ -59,6 +63,9 @@ int main() {
 	JOINT_VELOCITIES_KEY = "sai2::cs225a::panda_robot::sensors::dq";
 	JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::panda_robot::actuators::fgc";
 
+	// added force sensor
+	const std::string EE_FORCE_KEY = "cs225a::sensor::force";
+	const std::string EE_MOMENT_KEY = "cs225a::sensor::moment";
 	// start redis client
 	auto redis_client = RedisClient();
 	redis_client.connect();
@@ -86,6 +93,13 @@ int main() {
 	leg->_q = redis_client.getEigenMatrixJSON(LEG_JOINT_ANGLES_KEY);
 	VectorXd initial_leg_q = leg->_q;
 	cout << "leg->_q = " << leg->_q << "\n";
+
+	// load force sensor
+	const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.1);
+	Eigen::Vector3d sensed_force;
+	Eigen::Vector3d sensed_moment;
+	sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
+	sensed_moment = redis_client.getEigenMatrixJSON(EE_MOMENT_KEY);
 
 	// prepare controller
 	int dof = robot->dof();
@@ -181,6 +195,24 @@ int main() {
 	rot_desired *= AngleAxisd(M_PI, Vector3d::UnitZ()).toRotationMatrix();
 	rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
 
+	// Control point on the leg
+	Vector3d leg_point;
+	leg_point(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
+	leg_point(1) = 0.0;
+	leg_point(2) = l1 * cos(q1) + l2 * cos(q1 + q2);
+	// 2. Transform to world frame
+	leg_point = leg_point - T_world_leg;
+	leg_point = R_world_leg.inverse() * leg_point;
+	// 3. Transform to robot base frame
+	leg_point = leg_point + T_world_robot;
+	leg_point = R_world_robot * leg_point;
+
+
+	// Open gripper position
+	Vector2d open_gripper_pos = Vector2d::Zero();
+	open_gripper_pos(0) = 0.1;
+	open_gripper_pos(1) = -0.1;
+
 	while (runloop) {
 		// wait for next scheduled loop
 		timer.waitForNextLoop();
@@ -227,8 +259,9 @@ int main() {
 
 			// compute gripper torques
 			Vector2d gripper_pos_des = Vector2d::Zero();
-			gripper_pos_des(0) = 0.09;
-			gripper_pos_des(1) = -0.09;
+			gripper_pos_des = open_gripper_pos;
+			// gripper_pos_des(0) = 0.09;
+			// gripper_pos_des(1) = -0.09;
 			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
 
 		}
@@ -253,7 +286,24 @@ int main() {
 			Matrix3d rot;
 			robot->rotation(rot, control_link);
 			if ((pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15) {
-				cout << "Reached approach position.";
+				if (sensed_force.norm() > 1.0){
+					state = GRIP_CONTROLLER;
+				}
+				else{
+					// cout << "Reached approach position.";
+					// Vector between the control point on the leg and the current position
+					// 3. Transform the position to the robot base frame
+					pos = pos + T_world_robot;
+					pos = R_world_robot * pos;
+					// Vector3d position_increment = (leg_point - pos)*0.1;
+					Vector3d position_increment;
+					position_increment << 0.0, 0.0, -0.1;
+					X += position_increment;
+
+					posori_task->_desired_position = X; // Updated X to approach position
+					cout << posori_task->_desired_position << "\n";
+					posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
+				}
 			}
 
 			// compute torques
@@ -263,8 +313,9 @@ int main() {
 
 			// compute gripper torques
 			Vector2d gripper_pos_des = Vector2d::Zero();
-			gripper_pos_des(0) = 0.09;
-			gripper_pos_des(1) = -0.09;
+			gripper_pos_des = open_gripper_pos;
+			// gripper_pos_des(0) = 0.09;
+			// gripper_pos_des(1) = -0.09;
 			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
 		}
 
