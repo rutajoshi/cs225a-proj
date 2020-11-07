@@ -169,7 +169,6 @@ int main() {
 	X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
 	X(1) = 0.0;
 	X(2) = l1 * cos(q1) + l2 * cos(q1 + q2) + vertical_offset;
-	// X << 0.0, 0.0, 0.0;
 	// 2. Transform to world frame
 	X = X - T_world_leg;
 	X = R_world_leg.inverse() * X;
@@ -177,11 +176,9 @@ int main() {
 	X = X + T_world_robot;
 	X = R_world_robot * X;
 	// *** Set the desired orientation to be perpendicular to the leg ***
-	// rot_desired = AngleAxisd(-(q1 + q2 - M_PI/2.0) + (-35.0*M_PI/180), Vector3d::UnitY()).toRotationMatrix();
 	rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
 	rot_desired *= AngleAxisd(-M_PI, Vector3d::UnitX()).toRotationMatrix();
 	rot_desired *= AngleAxisd(M_PI, Vector3d::UnitZ()).toRotationMatrix();
-	// rot_desired *= AngleAxisd(M_PI/2.0 + (-35.0*M_PI/180), Vector3d::UnitZ()).toRotationMatrix();
 	rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
 
 	while (runloop) {
