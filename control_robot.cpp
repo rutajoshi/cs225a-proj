@@ -100,6 +100,7 @@ int main() {
 	Eigen::Vector3d sensed_force;
 	Eigen::Vector3d sensed_moment;
 	sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
+	// cout << "Sensed force = " << sensed_force << "\n";
 	sensed_moment = redis_client.getEigenMatrixJSON(EE_MOMENT_KEY);
 
 	// prepare controller
@@ -214,6 +215,11 @@ int main() {
 	open_gripper_pos(0) = 0.1;
 	open_gripper_pos(1) = -0.1;
 
+	// Closed gripper position
+	Vector2d closed_gripper_pos = Vector2d::Zero();
+	closed_gripper_pos(0) = 0.04;
+	closed_gripper_pos(1) = -0.04;
+
 	while (runloop) {
 		// wait for next scheduled loop
 		timer.waitForNextLoop();
@@ -287,12 +293,15 @@ int main() {
 			Matrix3d rot;
 			robot->rotation(rot, control_link);
 
-			cout << sensed_force << "\n";
+			sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
+			// cout << "Sensed force = " << sensed_force << "\n";
+
+			// cout << sensed_force << "\n";
 			if (sensed_force.norm() > 1.0){
 				state = GRIP_CONTROLLER;
-			}
-
-			else if ((pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15) {
+				X = pos;
+				X[2] += 0.02;
+			} else if ((pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15) {
 				// cout << "Reached approach position.";
 				// Vector between the control point on the leg and the current position
 				// 3. Transform the position to the robot base frame
@@ -322,7 +331,40 @@ int main() {
 		}
 
 		else if (state == GRIP_CONTROLLER) {
-			cout << "GRIP_CONTROLLER\n";
+			// cout << "GRIP_CONTROLLER\n";
+			// update task model and set hierarchy
+			N_prec.setIdentity();
+			posori_task->updateTaskModel(N_prec);
+			N_prec = posori_task->_N;
+			joint_task->updateTaskModel(N_prec);
+
+			// Maybe don't need this
+			// posori_task->reInitializeTask();
+			posori_task->_desired_position = X; // Updated X to approach position
+			posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
+
+			// Continue until you reach the approach position
+			Vector3d pos;
+			robot->position(pos, control_link, control_point);
+			Matrix3d rot;
+			robot->rotation(rot, control_link);
+
+			// if (gripped) {
+			// 	state = TRAJECTORY_CONTROLLER;
+			// }
+
+			// compute torques
+			posori_task->computeTorques(posori_task_torques);
+			joint_task->computeTorques(joint_task_torques);
+			command_torques = posori_task_torques + joint_task_torques;
+
+			cout << "Gripper positions = " << gripper_pos << "\n";
+
+			// compute gripper torques
+			Vector2d gripper_pos_des = Vector2d::Zero();
+			gripper_pos_des = closed_gripper_pos;
+			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
+
 		}
 
 		else if(state == TRAJECTORY_CONTROLLER)

@@ -71,7 +71,7 @@ bool fTransZp = false;
 bool fTransZn = false;
 bool fRotPanTilt = false;
 
-const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.0);
+const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.22);
 Eigen::Vector3d sensed_force;
 Eigen::Vector3d sensed_moment;
 
@@ -95,6 +95,7 @@ int main() {
 	graphics->showLinkFrame(true, robot_name, "link0", 0.15);
 	// graphics->showLinkFrame(true, robot_name, "link6", 0.15);
 	graphics->showLinkFrame(true, robot_name, "link7", 0.15);
+	graphics->showLinkFrame(true, robot_name, "leftfinger", 0.15);
 	graphics->_world->m_backgroundColor.setWhite();
 
 	// load robots
@@ -129,16 +130,9 @@ int main() {
 	sim->setJointVelocities(leg_name, leg->_dq);
 
 	// initialize force sensor: needs Sai2Simulation sim interface type
-	// MatrixXd force_sensor_tranform(4,4);
-	// force_sensor_tranform = Eigen::Affine3d::Identity();
-	// force_sensor_tranform[0][3] = 0.0;
-	// force_sensor_tranform[1][3] = 0.0;
-	// force_sensor_tranform[2][3] = 0.1; // this is the position of the force sensor
 	Eigen::Affine3d transform_sensor = Eigen::Affine3d::Identity();
 	transform_sensor.translation() = sensor_pos_in_link;
-	force_sensor = new ForceSensorSim(robot_name, "link7", transform_sensor, robot);
-	// force_sensor = new ForceSensorSim(robot_name, "link7", Eigen::Affine3d::Identity(), robot);
-	// force_sensor = new ForceSensorSim(robot_name, "leftfinger", transform_sensor, robot);
+	force_sensor = new ForceSensorSim(robot_name, "leftfinger", transform_sensor, robot);
 	force_display = new ForceSensorDisplay(force_sensor, graphics);
 
 	/*------- Set up visualization -------*/
@@ -282,7 +276,7 @@ int main() {
 }
 
 //------------------------------------------------------------------------------
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim, ForceSensorSim* fsensor1)
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim, ForceSensorSim* force_sensor)
 {
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
@@ -295,8 +289,8 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 	// leg dof
 	int leg_dof = leg->dof();
 	// sensed forces and moments from sensor
-	Eigen::Vector3d sensed_force;
-  Eigen::Vector3d sensed_moment;
+	// Eigen::Vector3d sensed_force;
+  // Eigen::Vector3d sensed_moment;
 
 	// create a timer
 	LoopTimer timer;
@@ -346,6 +340,8 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 		force_sensor->update(sim);
 		force_sensor->getForceLocalFrame(sensed_force);  // refer to ForceSensorSim.h in sai2-common/src/force_sensor (can also get wrt global frame)
     force_sensor->getMomentLocalFrame(sensed_moment);
+
+		// cout << "Sensed force = " << sensed_force << "\n";
 
 		// write new robot state to redis
 		redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q.head(7));

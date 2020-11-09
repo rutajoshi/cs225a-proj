@@ -148,7 +148,7 @@
         <geometry>
           <mesh filename="../../../model/panda/meshes/collision/hand.obj"/>
         </geometry>
-      </collision> 
+      </collision>
     </link>
     <link name="leftfinger">
       <inertial>
