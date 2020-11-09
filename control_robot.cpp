@@ -40,6 +40,7 @@ std::string JOINT_TORQUES_SENSED_KEY;
 std::string LEG_JOINT_ANGLES_KEY;
 // - write
 std::string JOINT_TORQUES_COMMANDED_KEY;
+std::string LEG_TORQUES_COMMANDED_KEY;
 
 // - model
 std::string MASSMATRIX_KEY;
@@ -62,6 +63,7 @@ int main() {
 	GRIPPER_JOINT_VELOCITIES_KEY = "sai2::cs225a::gripper::sensors::dq";
 	JOINT_VELOCITIES_KEY = "sai2::cs225a::panda_robot::sensors::dq";
 	JOINT_TORQUES_COMMANDED_KEY = "sai2::cs225a::panda_robot::actuators::fgc";
+	LEG_TORQUES_COMMANDED_KEY = "sai2::cs225a::leg_robot::actuators::fgc";
 
 	// added force sensor
 	const std::string EE_FORCE_KEY = "cs225a::sensor::force";
@@ -108,6 +110,7 @@ int main() {
 	VectorXd command_torques = VectorXd::Zero(dof);
 	Vector2d command_torques_hand = Vector2d::Zero();
 	VectorXd command_torques_full = VectorXd::Zero(9); // make a vector of 9 torques to send to the robot with the hand
+	VectorXd leg_command_torques = VectorXd::Zero(2);
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
 
 	// pose task
@@ -176,6 +179,8 @@ int main() {
 
 	// Helper variables
 	int count = 0;
+	int count_q1 = 0;
+	int count_q2 = 0;
 	Matrix3d rot_desired = Matrix3d::Identity();
 
 	// Pre-approach desired position and orientation
@@ -219,6 +224,10 @@ int main() {
 	Vector2d closed_gripper_pos = Vector2d::Zero();
 	closed_gripper_pos(0) = 0.04;
 	closed_gripper_pos(1) = -0.04;
+
+	// leg desired angles
+	double q1_des = -(25.0*M_PI/180)*cos(6*M_PI*count/100) - (35*M_PI/180);
+	double q2_des = (15*M_PI/180)*cos(6*M_PI*count/100) - (75.0*M_PI/180);
 
 	while (runloop) {
 		// wait for next scheduled loop
@@ -361,8 +370,10 @@ int main() {
 			posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
 
 			sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
-			if (abs(sensed_force[1]) > 1.0) {
+			cout << abs(sensed_force(1)) << "\n";
+			if (abs(sensed_force(1)) > 30.0) {
 				state = TRAJECTORY_CONTROLLER;
+				// cout << "TRAJECTORY_CONTROLLER" << "\n";
 			}
 
 			// compute torques
@@ -377,13 +388,15 @@ int main() {
 			// gripper_pos_des = open_gripper_pos; //closed_gripper_pos;
 			gripper_pos_des(0) = 0.05;
 			gripper_pos_des(1) = -0.05;
-			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
+			command_torques_hand(0) -= 10;
+			command_torques_hand(1) += 10;
+			// command_torques_hand = -5000.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
 
 		}
 
 		else if(state == TRAJECTORY_CONTROLLER)
 		{
-			cout << "TRAJECTORY_CONTROLLER\n";
+			// cout << "TRAJECTORY_CONTROLLER\n";
 			// update task model and set hierarchy
 			N_prec.setIdentity();
 			posori_task->updateTaskModel(N_prec);
@@ -393,18 +406,43 @@ int main() {
 			Vector3d pos;
 			robot->position(pos, control_link, control_point);
 
+			Matrix3d rot;
+			robot->rotation(rot, control_link);
+
+			q1 = leg->_q(0);
+			q2 = leg->_q(1);
+
+			rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
+			rot_desired *= AngleAxisd(-M_PI, Vector3d::UnitX()).toRotationMatrix();
+			rot_desired *= AngleAxisd(M_PI, Vector3d::UnitZ()).toRotationMatrix();
+			rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
+
 			double vertical_offset = 0.2;
 
-			if( (pos - X).norm() < 0.15 )
+			if( (pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15)
+			// if( (q1 - q1_des)<0.05 && (q2 - q2_des)<0.05 && (rot - rot_desired).norm() < 0.15)
 			{
 				cout << "Gripped leg, following trajectory.\n";
-				count += 1;
-				double q1 = (45.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (15.0*M_PI/180);
-				double q2 = (-30.0*M_PI/180)*sin(6*M_PI*count/100 - M_PI/2.0) - (90.0*M_PI/180);
+				// count +=1;
 
-				X(0) = -l1 * sin(q1) - l2 * sin(q1 + q2);
+				if ((q1 - q1_des) < 0.05) {
+					count_q1 += 1;
+					q1_des = -(25.0*M_PI/180)*cos(6*M_PI*count_q1/100) - (35*M_PI/180);
+				}
+
+				if ((q2 - q2_des) < 0.05) {
+					count_q2 += 1;
+					q2_des = (15*M_PI/180)*cos(6*M_PI*count_q2/100) - (75.0*M_PI/180);
+				}
+				// if( (q1 - q1_des)<0.05 && (q2 - q2_des)<0.05 && (rot - rot_desired).norm() < 0.15){
+				// 	count += 1;
+				// }
+				// q1_des = -(25.0*M_PI/180)*cos(6*M_PI*count/100) - (35*M_PI/180);
+				// q2_des = (15*M_PI/180)*cos(6*M_PI*count/100) - (75.0*M_PI/180);
+
+				X(0) = -l1 * sin(q1_des) - l2 * sin(q1_des + q2_des);
 				X(1) = 0.0;
-				X(2) = l1 * cos(q1) + l2 * cos(q1 + q2) + vertical_offset;
+				X(2) = l1 * cos(q1_des) + l2 * cos(q1_des + q2_des) + vertical_offset;
 
 				// original qs are in base-of-leg frame
 				// 1. transform from leg to world frame (subtract world->leg)
@@ -417,6 +455,21 @@ int main() {
 
 				posori_task->reInitializeTask();
 				posori_task->_desired_position = X;
+
+				q1 = leg->_q(0);
+				q2 = leg->_q(1);
+
+				rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
+				rot_desired *= AngleAxisd(-M_PI, Vector3d::UnitX()).toRotationMatrix();
+				rot_desired *= AngleAxisd(M_PI, Vector3d::UnitZ()).toRotationMatrix();
+				rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
+
+				posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
+
+				double k_knee = 0.5;
+				double center = -1.189;
+				leg_command_torques(1) = -k_knee*(leg->_q(1) - center);
+
 			}
 
 			// compute torques
@@ -431,7 +484,10 @@ int main() {
 			gripper_pos_des = closed_gripper_pos;
 			// gripper_pos_des(0) = 0.05 + 0.05 * sin(time);
 			// gripper_pos_des(1) = -0.05 - 0.05 * sin(time);
-			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
+			// command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
+			command_torques_hand(0) = -100;
+			command_torques_hand(1) = 100;
+
 			// command_torques_hand = -10.0 * gripper_vel; // -10.0 is kv
 		}
 
@@ -440,6 +496,7 @@ int main() {
 		// redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
 		command_torques_full << command_torques, command_torques_hand;
 		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques_full);
+		redis_client.setEigenMatrixJSON(LEG_TORQUES_COMMANDED_KEY, leg_command_torques);
 
 		controller_counter++;
 	}

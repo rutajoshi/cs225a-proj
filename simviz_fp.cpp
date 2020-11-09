@@ -38,8 +38,10 @@ const std::string LEG_JOINT_ANGLES_KEY = "sai2::cs225a::leg_robot::sensors::q";
 const std::string LEG_JOINT_VELOCITIES_KEY = "sai2::cs225a::leg_robot::sensors::dq";
 const std::string EE_FORCE_KEY = "cs225a::sensor::force";
 const std::string EE_MOMENT_KEY = "cs225a::sensor::moment";
+
 // - read
 const std::string TORQUES_COMMANDED_KEY = "sai2::cs225a::panda_robot::actuators::fgc";
+const std::string LEG_TORQUES_COMMANDED_KEY = "sai2::cs225a::leg_robot::actuators::fgc";
 const string CONTROLLER_RUNNING_KEY = "sai2::cs225a::controller_running";
 
 RedisClient redis_client;
@@ -96,6 +98,7 @@ int main() {
 	// graphics->showLinkFrame(true, robot_name, "link6", 0.15);
 	graphics->showLinkFrame(true, robot_name, "link7", 0.15);
 	graphics->showLinkFrame(true, robot_name, "leftfinger", 0.15);
+	graphics->showLinkFrame(true, leg_name, "link2", 0.15);
 	graphics->_world->m_backgroundColor.setWhite();
 
 	// load robots
@@ -104,14 +107,14 @@ int main() {
 
 	// load leg robot
 	auto leg = new Sai2Model::Sai2Model(leg_file, false);
-	leg->_q << -45*M_PI/180, 0*M_PI/180;  // fall
+	leg->_q << -45*M_PI/180, 0.2*M_PI/180;  // fall
 	// leg->_q << -90*M_PI/180, 0*M_PI/180;
 	leg->updateKinematics();
 
 	// load simulation world
 	auto sim = new Simulation::Sai2Simulation(world_file, false);
 	sim->setCollisionRestitution(0);
-	// sim->setCoeffFrictionStatic(0.8);
+	sim->setCoeffFrictionDynamic(0.8);
 	sim->setCoeffFrictionStatic(1.0);
 
 	// read joint positions, velocities, update model
@@ -280,8 +283,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 {
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
+	VectorXd leg_command_torques = VectorXd::Zero(leg->dof());
 	VectorXd gravity = VectorXd::Zero(dof);
 	redis_client.setEigenMatrixJSON(TORQUES_COMMANDED_KEY, command_torques);
+	redis_client.setEigenMatrixJSON(LEG_TORQUES_COMMANDED_KEY, leg_command_torques);
 
 	// setup redis client data container for pipeset (batch write)
 	std::vector<std::pair<std::string, std::string>> redis_data(2);  // set with the number of keys to write
@@ -313,6 +318,7 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 
 		// read arm torques from redis
 		command_torques = redis_client.getEigenMatrixJSON(TORQUES_COMMANDED_KEY);
+		leg_command_torques = redis_client.getEigenMatrixJSON(LEG_TORQUES_COMMANDED_KEY);
 
 		// get forces from interactive screen
 		// ui_force_widget->getUIForce(ui_force);
@@ -320,6 +326,13 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 
 		// set torques to simulation
 		sim->setJointTorques(robot_name, command_torques + gravity);
+		sim->setJointTorques(leg_name, leg_command_torques);
+
+		// calculate joint stiffness
+		// double k_knee = 2;
+		// double center = 1.185;
+		// leg_command_torques(1) = k_knee*(leg->_q(1) - center);
+		// sim->setJointTorques(leg_name, leg_command_torques);
 
 		// integrate forward
 		// double curr_time = timer.elapsedTime();
