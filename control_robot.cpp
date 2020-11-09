@@ -112,7 +112,7 @@ int main() {
 
 	// pose task
 	const string control_link = "link7";
-	const Vector3d control_point = Vector3d(0,0,0.07); //Vector3d(0,0,0.07);
+	const Vector3d control_point = Vector3d(0,0,0.15); //Vector3d(0,0,0.07);
 	auto posori_task = new Sai2Primitives::PosOriTask(robot, control_link, control_point);
 
 	// Set initial q1 and q2
@@ -293,14 +293,23 @@ int main() {
 			Matrix3d rot;
 			robot->rotation(rot, control_link);
 
-			sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
+			// sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
 			// cout << "Sensed force = " << sensed_force << "\n";
 
 			// cout << sensed_force << "\n";
-			if (sensed_force.norm() > 1.0){
-				state = GRIP_CONTROLLER;
+			// if (sensed_force.norm() > 1.0){
+			// 	state = GRIP_CONTROLLER;
+			// 	X = pos;
+			// 	X[2] += 0.02;
+			// } else
+
+			if (pos[2] < 0.21) {
 				X = pos;
-				X[2] += 0.02;
+				posori_task->_desired_position = X;
+				posori_task->_desired_orientation = rot_desired;
+				cout << "Final X before grip = " << X << "\n";
+				cout << "Gripper pos before grip = " << gripper_pos << "\n";
+				state = GRIP_CONTROLLER;
 			} else if ((pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15) {
 				// cout << "Reached approach position.";
 				// Vector between the control point on the leg and the current position
@@ -309,9 +318,19 @@ int main() {
 				pos = R_world_robot * pos;
 				// Vector3d position_increment = (leg_point - pos)*0.1;
 				Vector3d position_increment;
-				position_increment << 0.0, 0.0, -0.1;
+				position_increment << 0.0, 0.0, -0.05;
+
 				X += position_increment;
 
+				// if ((X + position_increment)[2] < 0.3) {
+				// 	cout << "Final X before grip = " << X << "\n";
+				// 	cout << "Gripper pos before grip = " << gripper_pos << "\n";
+				// 	state = GRIP_CONTROLLER;
+				// } else {
+				// 	X += position_increment;
+				// }
+
+				posori_task->reInitializeTask();
 				posori_task->_desired_position = X; // Updated X to approach position
 				// cout << posori_task->_desired_position << "\n";
 				posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
@@ -325,8 +344,6 @@ int main() {
 			// compute gripper torques
 			Vector2d gripper_pos_des = Vector2d::Zero();
 			gripper_pos_des = open_gripper_pos;
-			// gripper_pos_des(0) = 0.09;
-			// gripper_pos_des(1) = -0.09;
 			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
 		}
 
@@ -343,26 +360,23 @@ int main() {
 			posori_task->_desired_position = X; // Updated X to approach position
 			posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
 
-			// Continue until you reach the approach position
-			Vector3d pos;
-			robot->position(pos, control_link, control_point);
-			Matrix3d rot;
-			robot->rotation(rot, control_link);
-
-			// if (gripped) {
-			// 	state = TRAJECTORY_CONTROLLER;
-			// }
+			sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
+			if (abs(sensed_force[1]) > 1.0) {
+				state = TRAJECTORY_CONTROLLER;
+			}
 
 			// compute torques
 			posori_task->computeTorques(posori_task_torques);
 			joint_task->computeTorques(joint_task_torques);
 			command_torques = posori_task_torques + joint_task_torques;
 
-			cout << "Gripper positions = " << gripper_pos << "\n";
+			// cout << "Gripper positions = " << gripper_pos << "\n";
 
 			// compute gripper torques
 			Vector2d gripper_pos_des = Vector2d::Zero();
-			gripper_pos_des = closed_gripper_pos;
+			// gripper_pos_des = open_gripper_pos; //closed_gripper_pos;
+			gripper_pos_des(0) = 0.05;
+			gripper_pos_des(1) = -0.05;
 			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
 
 		}
@@ -414,8 +428,9 @@ int main() {
 
 			// GRIPPER CONTROLLER
 			Vector2d gripper_pos_des = Vector2d::Zero();
-			gripper_pos_des(0) = 0.05 + 0.05 * sin(time);
-			gripper_pos_des(1) = -0.05 - 0.05 * sin(time);
+			gripper_pos_des = closed_gripper_pos;
+			// gripper_pos_des(0) = 0.05 + 0.05 * sin(time);
+			// gripper_pos_des(1) = -0.05 - 0.05 * sin(time);
 			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
 			// command_torques_hand = -10.0 * gripper_vel; // -10.0 is kv
 		}

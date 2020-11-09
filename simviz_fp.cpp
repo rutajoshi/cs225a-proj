@@ -44,7 +44,7 @@ const string CONTROLLER_RUNNING_KEY = "sai2::cs225a::controller_running";
 
 RedisClient redis_client;
 
-// force sensor
+// force sensors
 ForceSensorSim* force_sensor;
 
 // display widget for forces at end effector
@@ -71,7 +71,7 @@ bool fTransZp = false;
 bool fTransZn = false;
 bool fRotPanTilt = false;
 
-const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.22);
+const Eigen::Vector3d sensor_pos_in_link = Eigen::Vector3d(0.0,0.0,0.1);
 Eigen::Vector3d sensed_force;
 Eigen::Vector3d sensed_moment;
 
