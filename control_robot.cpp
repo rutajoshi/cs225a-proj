@@ -141,7 +141,7 @@ int main() {
 
 
 #ifdef USING_OTG
-	posori_task->_use_interpolation_flag = true;
+	posori_task->_use_interpolation_flag = false;
 #else
 	posori_task->_use_velocity_saturation_flag = true;
 #endif
@@ -156,7 +156,7 @@ int main() {
 	auto joint_task = new Sai2Primitives::JointTask(robot);
 
 #ifdef USING_OTG
-	joint_task->_use_interpolation_flag = true;
+	joint_task->_use_interpolation_flag = false;
 #else
 	joint_task->_use_velocity_saturation_flag = true;
 #endif
@@ -173,6 +173,7 @@ int main() {
 	LoopTimer timer;
 	timer.initializeTimer();
 	timer.setLoopFrequency(1000);
+	// timer.setLoopFrequency(100);
 	double start_time = timer.elapsedTime(); //secs
 	bool fTimerDidSleep = true;
 	int state = PRE_APPROACH_CONTROLLER;
@@ -427,12 +428,12 @@ int main() {
 
 				if ((q1 - q1_des) < 0.05) {
 					count_q1 += 1;
-					q1_des = -(25.0*M_PI/180)*cos(6*M_PI*count_q1/100) - (35*M_PI/180);
+					q1_des = -(25.0*M_PI/180)*cos(6*M_PI*count_q1/50) - (35*M_PI/180);
 				}
 
 				if ((q2 - q2_des) < 0.05) {
 					count_q2 += 1;
-					q2_des = (15*M_PI/180)*cos(6*M_PI*count_q2/100) - (75.0*M_PI/180);
+					q2_des = (15*M_PI/180)*cos(6*M_PI*count_q2/50) - (75.0*M_PI/180);
 				}
 				// if( (q1 - q1_des)<0.05 && (q2 - q2_des)<0.05 && (rot - rot_desired).norm() < 0.15){
 				// 	count += 1;

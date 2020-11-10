@@ -31,7 +31,7 @@
           <sphere radius="0.07"/>
         </geometry>
         <material name="blue">
-          <color rgba="0.5 0.5 0.5 1"/>
+          <color rgba="0.65 0.33 0.17 1"/>
         </material>
       </visual>
       <!-- <visual>
@@ -46,11 +46,12 @@
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <cylinder radius="0.05" length="0.5"/>
+          <!-- <cylinder radius="0.05" length="0.5"/> -->
+          <mesh filename="../../../model/final_project/meshes/visual/long_thigh.obj"/>
         </geometry>
-        <material name="grey">
+        <!-- <material name="grey">
           <color rgba="0.5 0.5 0.5 1"/>
-        </material>
+        </material> -->
       </visual>
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />
@@ -71,7 +72,7 @@
           <sphere radius="0.07"/>
         </geometry>
         <material name="grey">
-          <color rgba="0.5 0.5 0.5 1"/>
+          <color rgba="0.65 0.33 0.17 1"/>
         </material>
       </visual>
       <!-- <visual>
@@ -96,7 +97,8 @@
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <!-- <cylinder radius="0.05" length="0.5"/> -->
-          <mesh filename="../../../model/final_project/meshes/visual/footlink.obj"/>
+          <!-- <mesh filename="../../../model/final_project/meshes/visual/footlink.obj"/> -->
+          <mesh filename="../../../model/final_project/meshes/visual/long_footlink.obj"/>
         </geometry>
         <!-- <material name="green">
           <color rgba="0 1 0 1"/>
