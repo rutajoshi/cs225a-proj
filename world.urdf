@@ -21,13 +21,16 @@
 	    </geometry>
 	  </collision>
 	  <visual>
-	    <origin xyz="0.0 0.0 0.05" rpy="0 0 0" />
+	    <!-- <origin xyz="0.0 0.0 0.05" rpy="0 0 0" /> -->
+			<origin xyz="0.0 0.0 0.32" rpy="0 0 0" />
 	    <geometry>
-	      <box size="3.0 1.5 0.5" />
+	      <!-- <box size="3.0 1.5 0.5" /> -->
+				<mesh filename="../../model/final_project/meshes/visual/table.obj"/>
 	    </geometry>
-	    <material name="material_grey">
+	    <!-- <material name="material_grey">
 	      <color rgba="0.1 0.1 0.1 1.0" />
-	    </material>
+				<mesh filename="../../model/final_project/meshes/visual/table.mtl"/>
+	    </material> -->
 	  </visual>
 	</static_object>
 
