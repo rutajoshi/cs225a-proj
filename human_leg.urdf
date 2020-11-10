@@ -31,25 +31,25 @@
           <sphere radius="0.07"/>
         </geometry>
         <material name="blue">
-          <color rgba="0 0 1 1"/>
+          <color rgba="0.5 0.5 0.5 1"/>
         </material>
       </visual>
-      <visual>
+      <!-- <visual>
         <origin xyz="0 0 0.25" rpy="0 0 0" />
         <geometry>
           <sphere radius="0.07"/>
         </geometry>
-        <material name="blue">
-          <color rgba="0 0 0 1"/>
+        <material name="grey">
+          <color rgba="0.1 0.1 0.1 1"/>
         </material>
-      </visual>
+      </visual> -->
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
           <cylinder radius="0.05" length="0.5"/>
         </geometry>
-        <material name="red">
-          <color rgba="1 0 0 1"/>
+        <material name="grey">
+          <color rgba="0.5 0.5 0.5 1"/>
         </material>
       </visual>
       <collision>
@@ -70,20 +70,20 @@
         <geometry>
           <sphere radius="0.07"/>
         </geometry>
-        <material name="blue">
-          <color rgba="0 0 1 1"/>
+        <material name="grey">
+          <color rgba="0.5 0.5 0.5 1"/>
         </material>
       </visual>
-      <visual>
+      <!-- <visual>
         <origin xyz="0 0 0.5" rpy="0 0 0" />
         <geometry>
           <sphere radius="0.07"/>
         </geometry>
-        <material name="blue">
+        <material name="grey">
           <color rgba="0 0 1 1"/>
         </material>
-      </visual>
-      <visual>
+      </visual> -->
+      <!-- <visual>
         <origin xyz="0 0 0.25" rpy="0 0 0" />
         <geometry>
           <sphere radius="0.07"/>
@@ -91,16 +91,16 @@
         <material name="blue">
           <color rgba="0 0 0 1"/>
         </material>
-      </visual>
+      </visual> -->
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <!-- <cylinder radius="0.05" length="0.5"/> -->
           <mesh filename="../../../model/final_project/meshes/visual/footlink.obj"/>
         </geometry>
-        <material name="green">
+        <!-- <material name="green">
           <color rgba="0 1 0 1"/>
-        </material>
+        </material> -->
       </visual>
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />

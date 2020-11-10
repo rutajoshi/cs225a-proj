@@ -93,12 +93,12 @@ int main() {
 	auto graphics = new Sai2Graphics::Sai2Graphics(world_file, true);
 	Eigen::Vector3d camera_pos, camera_lookat, camera_vertical;
 	graphics->getCameraPose(camera_name, camera_pos, camera_vertical, camera_lookat);
-	graphics->showLinkFrame(true, leg_name, "link0", 0.15);
-	graphics->showLinkFrame(true, robot_name, "link0", 0.15);
+	// graphics->showLinkFrame(true, leg_name, "link0", 0.15);
+	// graphics->showLinkFrame(true, robot_name, "link0", 0.15);
 	// graphics->showLinkFrame(true, robot_name, "link6", 0.15);
-	graphics->showLinkFrame(true, robot_name, "link7", 0.15);
-	graphics->showLinkFrame(true, robot_name, "leftfinger", 0.15);
-	graphics->showLinkFrame(true, leg_name, "link2", 0.15);
+	// graphics->showLinkFrame(true, robot_name, "link7", 0.15);
+	// graphics->showLinkFrame(true, robot_name, "leftfinger", 0.15);
+	// graphics->showLinkFrame(true, leg_name, "link2", 0.15);
 	graphics->_world->m_backgroundColor.setWhite();
 
 	// load robots
@@ -136,7 +136,7 @@ int main() {
 	Eigen::Affine3d transform_sensor = Eigen::Affine3d::Identity();
 	transform_sensor.translation() = sensor_pos_in_link;
 	force_sensor = new ForceSensorSim(robot_name, "leftfinger", transform_sensor, robot);
-	force_display = new ForceSensorDisplay(force_sensor, graphics);
+	// force_display = new ForceSensorDisplay(force_sensor, graphics);
 
 	/*------- Set up visualization -------*/
 	// set up error callback
@@ -192,7 +192,7 @@ int main() {
 		graphics->render(camera_name, width, height);
 
 		// display force
-		force_display->update();
+		// force_display->update();
 
 		// swap buffers
 		glfwSwapBuffers(window);
