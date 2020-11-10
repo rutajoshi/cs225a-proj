@@ -485,8 +485,8 @@ int main() {
 			// gripper_pos_des(0) = 0.05 + 0.05 * sin(time);
 			// gripper_pos_des(1) = -0.05 - 0.05 * sin(time);
 			// command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
-			command_torques_hand(0) = -100;
-			command_torques_hand(1) = 100;
+			command_torques_hand(0) = -30;
+			command_torques_hand(1) = 30;
 
 			// command_torques_hand = -10.0 * gripper_vel; // -10.0 is kv
 		}
