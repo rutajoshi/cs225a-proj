@@ -29,6 +29,7 @@ const string leg_file = "./resources/human_leg.urdf";
 #define APPROACH_CONTROLLER			1
 #define GRIP_CONTROLLER					2
 #define TRAJECTORY_CONTROLLER		3
+#define POST_TRAJECTORY_CONTROLLER 4
 
 // redis keys:
 // - read:
@@ -139,9 +140,13 @@ int main() {
 									 1, 0, 0,
 									 0, 0, 1;
 
+	// dropping position of the leg
+	double q1_drop = 0;
+	double q2_drop = 0;
+
 
 #ifdef USING_OTG
-	posori_task->_use_interpolation_flag = false;
+	posori_task->_use_interpolation_flag = true;
 #else
 	posori_task->_use_velocity_saturation_flag = true;
 #endif
@@ -156,7 +161,7 @@ int main() {
 	auto joint_task = new Sai2Primitives::JointTask(robot);
 
 #ifdef USING_OTG
-	joint_task->_use_interpolation_flag = false;
+	joint_task->_use_interpolation_flag = true;
 #else
 	joint_task->_use_velocity_saturation_flag = true;
 #endif
@@ -428,12 +433,20 @@ int main() {
 
 				if ((q1 - q1_des) < 0.05) {
 					count_q1 += 1;
-					q1_des = -(25.0*M_PI/180)*cos(6*M_PI*count_q1/50) - (35*M_PI/180);
+					q1_des = -(25.0*M_PI/180)*cos(6*M_PI*count_q1/100) - (35*M_PI/180);
 				}
 
 				if ((q2 - q2_des) < 0.05) {
 					count_q2 += 1;
-					q2_des = (15*M_PI/180)*cos(6*M_PI*count_q2/50) - (75.0*M_PI/180);
+					q2_des = (15*M_PI/180)*cos(6*M_PI*count_q2/100) - (75.0*M_PI/180);
+				}
+
+				if (count_q1 > 132 || count_q2 > 132){
+					state = POST_TRAJECTORY_CONTROLLER;
+
+					q1_drop = leg->_q(0);
+					q2_drop = leg->_q(1);
+
 				}
 				// if( (q1 - q1_des)<0.05 && (q2 - q2_des)<0.05 && (rot - rot_desired).norm() < 0.15){
 				// 	count += 1;
@@ -490,6 +503,63 @@ int main() {
 			command_torques_hand(1) = 30;
 
 			// command_torques_hand = -10.0 * gripper_vel; // -10.0 is kv
+		}
+
+		if(state == POST_TRAJECTORY_CONTROLLER)
+		{
+			cout << "POST_TRAJECTORY_CONTROLLER" << "\n";
+			// update task model and set hierarchy
+			N_prec.setIdentity();
+			posori_task->updateTaskModel(N_prec);
+			N_prec = posori_task->_N;
+			joint_task->updateTaskModel(N_prec);
+
+
+			X(0) = -l1 * sin(q1_drop) - l2 * sin(q1_drop + q2_drop);
+			X(1) = 0.0;
+			X(2) = l1 * cos(q1_drop) + l2 * cos(q1_drop + q2_drop) + vertical_offset;
+
+			X = X - T_world_leg;
+			X = R_world_leg * X;
+
+			// 2. transform from world to robot frame (add world->robot)
+			X = X + T_world_robot;
+			X = R_world_robot * X;
+
+			posori_task->reInitializeTask();
+			posori_task->_desired_position = X;
+
+			rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
+			rot_desired *= AngleAxisd(-M_PI, Vector3d::UnitX()).toRotationMatrix();
+			rot_desired *= AngleAxisd(M_PI, Vector3d::UnitZ()).toRotationMatrix();
+			rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
+
+			posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
+
+			// sensed_force = redis_client.getEigenMatrixJSON(EE_FORCE_KEY);
+			// cout << abs(sensed_force(1)) << "\n";
+			// if (abs(sensed_force(1)) > 30.0) {
+			// 	state = TRAJECTORY_CONTROLLER;
+			// 	// cout << "TRAJECTORY_CONTROLLER" << "\n";
+			// }
+
+			// compute torques
+			posori_task->computeTorques(posori_task_torques);
+			joint_task->computeTorques(joint_task_torques);
+			command_torques = posori_task_torques + joint_task_torques;
+
+			// compute torques
+			posori_task->computeTorques(posori_task_torques);
+			joint_task->computeTorques(joint_task_torques);
+			command_torques = posori_task_torques + joint_task_torques;
+
+			// compute gripper torques
+			Vector2d gripper_pos_des = Vector2d::Zero();
+			gripper_pos_des = open_gripper_pos;
+			// gripper_pos_des(0) = 0.09;
+			// gripper_pos_des(1) = -0.09;
+			command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
+
 		}
 
 		// send to redis
