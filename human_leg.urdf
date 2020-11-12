@@ -7,12 +7,12 @@
         <mass value="4" />
         <inertia ixx="0.4" iyy="0.4" izz="0.4" ixy="0" ixz="0" iyz="0" />
       </inertial>
-      <visual>
+      <!-- <visual>
         <origin xyz="0 -0.2 0" rpy="-1.57 0 0" />
         <geometry>
           <mesh filename="../../../model/panda/meshes/visual/link0.obj"/>
         </geometry>
-      </visual>
+      </visual> -->
       <!-- <collision>
         <geometry>
           <mesh filename="../../../model/panda/meshes/collision/link0.obj"/>
