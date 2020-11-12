@@ -25,7 +25,9 @@ const string robot_file = "./resources/panda_arm_hand.urdf";
 const string robot_name = "panda_arm_hand";
 const string leg_file = "./resources/human_leg.urdf"; // Added
 const string leg_name = "human_leg"; // Added
-const string leg_link_name = "link2";
+const string leg_link_name = "link2"; // Added
+const string right_leg_file = "./resources/human_leg_right.urdf";
+const string right_leg_name = "human_leg_right";
 const string camera_name = "camera_fixed";
 
 // redis keys:
@@ -53,7 +55,7 @@ ForceSensorSim* force_sensor;
 ForceSensorDisplay* force_display;
 
 // simulation function prototype
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim, ForceSensorSim* force_sensor);
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Sai2Model::Sai2Model* right_leg, Simulation::Sai2Simulation* sim, ForceSensorSim* force_sensor);
 
 // callback to print glfw errors
 void glfwError(int error, const char* description);
@@ -111,6 +113,11 @@ int main() {
 	// leg->_q << -90*M_PI/180, 0*M_PI/180;
 	leg->updateKinematics();
 
+	// load right leg robot
+	auto right_leg = new Sai2Model::Sai2Model(right_leg_file, false);
+	right_leg->_q << -45*M_PI/180, 0.2*M_PI/180;  // fall
+	right_leg->updateKinematics();
+
 	// load simulation world
 	auto sim = new Simulation::Sai2Simulation(world_file, false);
 	sim->setCollisionRestitution(0);
@@ -131,6 +138,9 @@ int main() {
 
 	sim->setJointPositions(leg_name, leg->_q);
 	sim->setJointVelocities(leg_name, leg->_dq);
+
+	sim->setJointPositions(right_leg_name, right_leg->_q);
+	sim->setJointVelocities(right_leg_name, right_leg->_dq);
 
 	// initialize force sensor: needs Sai2Simulation sim interface type
 	Eigen::Affine3d transform_sensor = Eigen::Affine3d::Identity();
@@ -178,7 +188,7 @@ int main() {
 
 	redis_client.set(CONTROLLER_RUNNING_KEY, "0");
 	fSimulationRunning = true;
-	thread sim_thread(simulation, robot, leg, sim, force_sensor);
+	thread sim_thread(simulation, robot, leg, right_leg, sim, force_sensor);
 
 	// while window is open:
 	while (fSimulationRunning)
@@ -189,6 +199,7 @@ int main() {
 		glfwGetFramebufferSize(window, &width, &height);
 		graphics->updateGraphics(robot_name, robot);
 		graphics->updateGraphics(leg_name, leg);
+		graphics->updateGraphics(right_leg_name, right_leg);
 		graphics->render(camera_name, width, height);
 
 		// display force
@@ -279,7 +290,7 @@ int main() {
 }
 
 //------------------------------------------------------------------------------
-void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulation::Sai2Simulation* sim, ForceSensorSim* force_sensor)
+void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Sai2Model::Sai2Model* right_leg, Simulation::Sai2Simulation* sim, ForceSensorSim* force_sensor)
 {
 	int dof = robot->dof();
 	VectorXd command_torques = VectorXd::Zero(dof);
@@ -328,6 +339,8 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 		sim->setJointTorques(robot_name, command_torques + gravity);
 		sim->setJointTorques(leg_name, leg_command_torques);
 
+		sim->setJointTorques(right_leg_name, leg_command_torques);
+
 		// calculate joint stiffness
 		// double k_knee = 2;
 		// double center = 1.185;
@@ -348,6 +361,10 @@ void simulation(Sai2Model::Sai2Model* robot, Sai2Model::Sai2Model* leg, Simulati
 		sim->getJointPositions(leg_name, leg->_q);
 		sim->getJointVelocities(leg_name, leg->_dq);
 		leg->updateKinematics();
+
+		sim->getJointPositions(right_leg_name, right_leg->_q);
+		sim->getJointVelocities(right_leg_name, right_leg->_dq);
+		right_leg->updateKinematics();
 
 		// update force sensor readings
 		force_sensor->update(sim);

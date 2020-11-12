@@ -1,0 +1,133 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="right_leg">
+
+    <link name="link0">
+      <inertial>
+        <origin xyz="0 -0.2 0" rpy="0 0 0" />
+        <mass value="4" />
+        <inertia ixx="0.4" iyy="0.4" izz="0.4" ixy="0" ixz="0" iyz="0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 -0.2 0" rpy="-1.57 0 0" />
+        <geometry>
+          <mesh filename="../../../model/panda/meshes/visual/link0.obj"/>
+        </geometry>
+      </visual>
+      <!-- <collision>
+        <geometry>
+          <mesh filename="../../../model/panda/meshes/collision/link0.obj"/>
+        </geometry>
+      </collision> -->
+    </link>
+    <link name="link1">
+      <inertial>
+        <origin xyz="0 0 0.25" rpy="0 0 0" />
+        <mass value="1" />
+        <inertia ixx="0.3" iyy="0.3" izz="0.3" ixy="0" ixz="0" iyz="0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <sphere radius="0.07"/>
+        </geometry>
+        <material name="blue">
+          <color rgba="0.65 0.33 0.17 1"/>
+        </material>
+      </visual>
+      <!-- <visual>
+        <origin xyz="0 0 0.25" rpy="0 0 0" />
+        <geometry>
+          <sphere radius="0.07"/>
+        </geometry>
+        <material name="grey">
+          <color rgba="0.1 0.1 0.1 1"/>
+        </material>
+      </visual> -->
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <!-- <cylinder radius="0.05" length="0.5"/> -->
+          <mesh filename="../../../model/final_project/meshes/visual/long_thigh.obj"/>
+        </geometry>
+        <!-- <material name="grey">
+          <color rgba="0.5 0.5 0.5 1"/>
+        </material> -->
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <cylinder radius="0.05" length="0.5"/>
+        </geometry>
+      </collision>
+    </link>
+    <link name="link2">
+      <inertial>
+        <origin xyz="0 0 0.25" rpy="0 0 0" />
+        <mass value="1" />
+        <inertia ixx="0.3" iyy="0.3" izz="0.3" ixy="0" ixz="0" iyz="0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <sphere radius="0.07"/>
+        </geometry>
+        <material name="grey">
+          <color rgba="0.65 0.33 0.17 1"/>
+        </material>
+      </visual>
+      <!-- <visual>
+        <origin xyz="0 0 0.5" rpy="0 0 0" />
+        <geometry>
+          <sphere radius="0.07"/>
+        </geometry>
+        <material name="grey">
+          <color rgba="0 0 1 1"/>
+        </material>
+      </visual> -->
+      <!-- <visual>
+        <origin xyz="0 0 0.25" rpy="0 0 0" />
+        <geometry>
+          <sphere radius="0.07"/>
+        </geometry>
+        <material name="blue">
+          <color rgba="0 0 0 1"/>
+        </material>
+      </visual> -->
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <!-- <cylinder radius="0.05" length="0.5"/> -->
+          <!-- <mesh filename="../../../model/final_project/meshes/visual/footlink.obj"/> -->
+          <mesh filename="../../../model/final_project/meshes/visual/right_footlink.obj"/>
+        </geometry>
+        <!-- <material name="green">
+          <color rgba="0 1 0 1"/>
+        </material> -->
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <cylinder radius="0.05" length="0.5"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="joint1" type="revolute">
+      <safety_controller k_position="100.0" k_velocity="40.0" soft_lower_limit="-2.8973" soft_upper_limit="2.8973"/>
+      <!-- <origin rpy="0 -1.57079632679 0" xyz="0.5 0 0.2"/> -->
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <parent link="link0"/>
+      <child link="link1"/>
+      <axis xyz="0 1 0"/> <!-- negative y direction is rotational axis -->
+      <limit effort="87" lower="-2.8973" upper="2.8973" velocity="2.1750"/>
+    </joint>
+    <joint name="joint2" type="revolute">
+      <safety_controller k_position="100.0" k_velocity="40.0" soft_lower_limit="-1.7628" soft_upper_limit="1.7628"/>
+      <origin rpy="0 0 0" xyz="0 0 0.5"/>
+      <parent link="link1"/>
+      <child link="link2"/>
+      <axis xyz="0 1 0"/> <!-- negative y direction is rotational axis -->
+      <limit effort="87" lower="-1.7628" upper="-0.61" velocity="2.1750"/>
+    </joint>
+
+</robot>
