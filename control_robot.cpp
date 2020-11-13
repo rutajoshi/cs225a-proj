@@ -25,11 +25,12 @@ using namespace Eigen;
 const string robot_file = "./resources/panda_arm.urdf";
 const string leg_file = "./resources/human_leg.urdf";
 
-#define PRE_APPROACH_CONTROLLER	0
-#define APPROACH_CONTROLLER			1
-#define GRIP_CONTROLLER					2
-#define TRAJECTORY_CONTROLLER		3
-#define POST_TRAJECTORY_CONTROLLER 4
+#define PRE_APPROACH_CONTROLLER			0
+#define APPROACH_CONTROLLER					1
+#define GRIP_CONTROLLER							2
+#define TRAJECTORY_CONTROLLER				3
+#define TRAJECTORY_CONTROLLER_2			4
+#define POST_TRAJECTORY_CONTROLLER 	5
 
 // redis keys:
 // - read:
@@ -325,6 +326,7 @@ int main() {
 				cout << "Final X before grip = " << X << "\n";
 				cout << "Gripper pos before grip = " << gripper_pos << "\n";
 				state = GRIP_CONTROLLER;
+				posori_task->reInitializeTask();
 			} else if ((pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15) {
 				// cout << "Reached approach position.";
 				// Vector between the control point on the leg and the current position
@@ -345,7 +347,6 @@ int main() {
 				// 	X += position_increment;
 				// }
 
-				posori_task->reInitializeTask();
 				posori_task->_desired_position = X; // Updated X to approach position
 				// cout << posori_task->_desired_position << "\n";
 				posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
@@ -379,6 +380,7 @@ int main() {
 			cout << abs(sensed_force(1)) << "\n";
 			if (abs(sensed_force(1)) > 30.0) {
 				state = TRAJECTORY_CONTROLLER;
+				posori_task->reInitializeTask();
 				// cout << "TRAJECTORY_CONTROLLER" << "\n";
 			}
 
@@ -441,18 +443,21 @@ int main() {
 					q2_des = (15*M_PI/180)*cos(6*M_PI*count_q2/100) - (75.0*M_PI/180);
 				}
 
-				if (count_q1 > 132 || count_q2 > 132){
-					state = POST_TRAJECTORY_CONTROLLER;
+				if (count_q1 > 66 || count_q2 > 66){
+					state = TRAJECTORY_CONTROLLER_2;
 
-					q1_drop = leg->_q(0);
-					q2_drop = leg->_q(1);
+					count_q1 = 0;
+					count_q2 = 0;
+
+					q1_des = -70.0*M_PI / 180.0;
+					q2_des = -10.0*M_PI / 180.0;
+
+					posori_task->reInitializeTask();
+
+					// q1_drop = leg->_q(0);
+					// q2_drop = leg->_q(1);
 
 				}
-				// if( (q1 - q1_des)<0.05 && (q2 - q2_des)<0.05 && (rot - rot_desired).norm() < 0.15){
-				// 	count += 1;
-				// }
-				// q1_des = -(25.0*M_PI/180)*cos(6*M_PI*count/100) - (35*M_PI/180);
-				// q2_des = (15*M_PI/180)*cos(6*M_PI*count/100) - (75.0*M_PI/180);
 
 				X(0) = -l1 * sin(q1_des) - l2 * sin(q1_des + q2_des);
 				X(1) = 0.0;
@@ -467,7 +472,7 @@ int main() {
 				X = X + T_world_robot;
 				X = R_world_robot * X;
 
-				posori_task->reInitializeTask();
+				// posori_task->reInitializeTask();
 				posori_task->_desired_position = X;
 
 				q1 = leg->_q(0);
@@ -505,7 +510,109 @@ int main() {
 			// command_torques_hand = -10.0 * gripper_vel; // -10.0 is kv
 		}
 
-		if(state == POST_TRAJECTORY_CONTROLLER)
+		else if(state == TRAJECTORY_CONTROLLER_2)
+		{
+			// cout << "TRAJECTORY_CONTROLLER\n";
+			// update task model and set hierarchy
+			N_prec.setIdentity();
+			posori_task->updateTaskModel(N_prec);
+			N_prec = posori_task->_N;
+			joint_task->updateTaskModel(N_prec);
+
+			Vector3d pos;
+			robot->position(pos, control_link, control_point);
+
+			Matrix3d rot;
+			robot->rotation(rot, control_link);
+
+			q1 = leg->_q(0);
+			q2 = leg->_q(1);
+
+			rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
+			rot_desired *= AngleAxisd(-M_PI, Vector3d::UnitX()).toRotationMatrix();
+			rot_desired *= AngleAxisd(M_PI, Vector3d::UnitZ()).toRotationMatrix();
+			rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
+
+			double vertical_offset = 0.2;
+
+			if( (pos - X).norm() < 0.15 && (rot - rot_desired).norm() < 0.15)
+			// if( (q1 - q1_des)<0.05 && (q2 - q2_des)<0.05 && (rot - rot_desired).norm() < 0.15)
+			{
+				cout << "Gripped leg, following trajectory 2.\n";
+				// count +=1;
+
+				if ((q1 - q1_des) < 0.05) {
+					count_q1 += 1;
+					q1_des = -(15.0*M_PI/180)*cos(6*M_PI*count_q1/100) - (55.0*M_PI/180);
+				}
+
+				// if ((q2 - q2_des) < 0.05) {
+				// 	// count_q2 += 1;
+				// 	q2_des = -10.0*M_PI/180.0;
+				// }
+
+				if (count_q1 > 66){
+					state = POST_TRAJECTORY_CONTROLLER;
+
+					posori_task->reInitializeTask();
+
+					q1_drop = leg->_q(0);
+					q2_drop = leg->_q(1);
+
+				}
+
+				X(0) = -l1 * sin(q1_des) - l2 * sin(q1_des + q2_des);
+				X(1) = 0.0;
+				X(2) = l1 * cos(q1_des) + l2 * cos(q1_des + q2_des) + vertical_offset;
+
+				// original qs are in base-of-leg frame
+				// 1. transform from leg to world frame (subtract world->leg)
+				X = X - T_world_leg;
+				X = R_world_leg * X;
+
+				// 2. transform from world to robot frame (add world->robot)
+				X = X + T_world_robot;
+				X = R_world_robot * X;
+
+				// posori_task->reInitializeTask();
+				posori_task->_desired_position = X;
+
+				q1 = leg->_q(0);
+				q2 = leg->_q(1);
+
+				rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
+				rot_desired *= AngleAxisd(-M_PI, Vector3d::UnitX()).toRotationMatrix();
+				rot_desired *= AngleAxisd(M_PI, Vector3d::UnitZ()).toRotationMatrix();
+				rot_desired = R_world_robot * (R_world_leg.inverse() * rot_desired);
+
+				posori_task->_desired_orientation = rot_desired; // Updated to approach orientation
+
+				double k_knee = 0.5;
+				double center = -1.189;
+				leg_command_torques(1) = -k_knee*(leg->_q(1) - center);
+
+			}
+
+			// compute torques
+			posori_task->computeTorques(posori_task_torques);
+			joint_task->computeTorques(joint_task_torques);
+
+			command_torques = posori_task_torques + joint_task_torques;
+			// command_torques = posori_task_torques;
+
+			// GRIPPER CONTROLLER
+			Vector2d gripper_pos_des = Vector2d::Zero();
+			gripper_pos_des = closed_gripper_pos;
+			// gripper_pos_des(0) = 0.05 + 0.05 * sin(time);
+			// gripper_pos_des(1) = -0.05 - 0.05 * sin(time);
+			// command_torques_hand = -20.0 * (gripper_pos - gripper_pos_des) - 5.0 * gripper_vel;
+			command_torques_hand(0) = -30;
+			command_torques_hand(1) = 30;
+
+			// command_torques_hand = -10.0 * gripper_vel; // -10.0 is kv
+		}
+
+		else if(state == POST_TRAJECTORY_CONTROLLER)
 		{
 			cout << "POST_TRAJECTORY_CONTROLLER" << "\n";
 			// update task model and set hierarchy
@@ -526,7 +633,7 @@ int main() {
 			X = X + T_world_robot;
 			X = R_world_robot * X;
 
-			posori_task->reInitializeTask();
+			// posori_task->reInitializeTask();
 			posori_task->_desired_position = X;
 
 			rot_desired = AngleAxisd(-(q1 + q2 + M_PI/2.0), Vector3d::UnitY()).toRotationMatrix();
@@ -562,12 +669,11 @@ int main() {
 
 		}
 
-		// send to redis
-		// cout << "Sending torques to redis\n";
-		// redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques);
-		command_torques_full << command_torques, command_torques_hand;
-		redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques_full);
-		redis_client.setEigenMatrixJSON(LEG_TORQUES_COMMANDED_KEY, leg_command_torques);
+		if (controller_counter % 10 == 0) {
+			command_torques_full << command_torques, command_torques_hand;
+			redis_client.setEigenMatrixJSON(JOINT_TORQUES_COMMANDED_KEY, command_torques_full);
+			redis_client.setEigenMatrixJSON(LEG_TORQUES_COMMANDED_KEY, leg_command_torques);
+		}
 
 		controller_counter++;
 	}

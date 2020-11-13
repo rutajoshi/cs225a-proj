@@ -17,6 +17,16 @@
 		<model dir="./resources" path="human_leg_right.urdf" name="human_leg_right" />
 	</robot>
 
+	<static_object name="upper_body">
+		<origin xyz="1.2 0.125 0.15" rpy="0 0 0" />
+		<visual>
+			<origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
+			<geometry>
+				<mesh filename="../../model/final_project/meshes/visual/upper_body.obj"/>
+			</geometry>
+		</visual>
+	</static_object>
+
 	<static_object name="Table">
 	  <origin xyz="1.0 0.0 -0.25" rpy="0 0 0" />
 	  <collision>
