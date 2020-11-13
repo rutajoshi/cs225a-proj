@@ -161,7 +161,7 @@
         <geometry>
           <!-- <mesh filename="../../../model/panda/meshes/visual/finger.obj"/> -->
           <!-- <mesh filename="../../../model/final_project/meshes/collision/gripper.obj"/> -->
-          <mesh filename="../../../model/final_project/meshes/visual/gripper_soft.obj"/>
+          <mesh filename="../../../model/final_project/meshes/visual/chunky_gripper.obj"/>
         </geometry>
       </visual>
       <collision>
@@ -182,7 +182,7 @@
         <geometry>
           <!-- <mesh filename="../../../model/panda/meshes/visual/finger.obj"/> -->
           <!-- <mesh filename="../../../model/final_project/meshes/collision/gripper.obj"/> -->
-          <mesh filename="../../../model/final_project/meshes/visual/gripper_soft.obj"/>
+          <mesh filename="../../../model/final_project/meshes/visual/chunky_gripper.obj"/>
         </geometry>
       </visual>
       <collision>

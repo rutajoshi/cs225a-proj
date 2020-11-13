@@ -554,6 +554,9 @@ int main() {
 				if (count_q1 > 66){
 					state = POST_TRAJECTORY_CONTROLLER;
 
+					q1_des = -65.0*M_PI/180.0;
+					q2_des = -30.0*M_PI/180.0;
+
 					posori_task->reInitializeTask();
 
 					q1_drop = leg->_q(0);
