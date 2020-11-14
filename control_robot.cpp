@@ -543,7 +543,7 @@ int main() {
 
 				if ((q1 - q1_des) < 0.05) {
 					count_q1 += 1;
-					q1_des = -(15.0*M_PI/180)*cos(6*M_PI*count_q1/100) - (55.0*M_PI/180);
+					q1_des = -(15.0*M_PI/180)*cos(6*M_PI*count_q1/100) - (65.0*M_PI/180);
 				}
 
 				// if ((q2 - q2_des) < 0.05) {
